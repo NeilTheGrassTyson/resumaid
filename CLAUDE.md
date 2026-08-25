@@ -88,14 +88,45 @@ When it isn't obvious which tier something falls into, treat it as Tier 1.
 
 ---
 
-## Stack — not yet chosen
+## Targeting
 
-Nothing has been decided. There is no approved backend, database, frontend, or
-hosting target, and there is no code in this repository yet.
+What the matcher is aiming at. Role families in priority order:
 
-**Do not assume a stack and do not begin scaffolding one.** The first plan-mode
-session proposes two or three options and the founder picks one; this section gets
-filled in with the decision at that point.
+1. **Aerospace and defense** — software engineering, or internal AI work. This is the
+   strongest interest, and AI-focused defense startups are the sharpest version of it.
+   Anduril is the gold-standard example of the kind of company meant here.
+2. **Big tech and general software.**
+3. **Finance** — lowest priority. There is little business background to draw on, so
+   these roles need a higher bar to be worth preparing.
+
+Filter roles on degree level, education, and industry interest. Beyond fit, two rules
+shape what surfaces:
+
+- **Recency counts.** A recently posted role ranks above an equally-fitting stale one.
+  Applications land better before a posting has collected hundreds of responses.
+- **Breadth counts.** The goal is a diverse, thorough set of companies — not a short
+  list of favorites re-checked every day.
+
+Throughput target: roughly **5 applications per day** reaching the review queue.
+
+One clarification, because the wording matters here more than anywhere else in this
+file: the tool automatically **finds and prepares**. It never automatically **sends**.
+Nothing in this section modifies constraint 1 — "auto" describes discovery and
+tailoring, never submission.
+
+---
+
+## Stack — local-first, specifics not yet chosen
+
+Local-only is decided: this runs on one machine, for one user, with no hosting target.
+A hosted version is a possibility later, if the tool proves itself in daily use — it is
+not something to design toward now, and it is not a reason to reach for a multi-tenant
+architecture today.
+
+The specific backend, storage, and UI are still open. **Do not assume a stack and do
+not begin scaffolding one.** The first plan-mode session proposes two or three options
+consistent with local-first, and the founder picks one; this section records the
+decision at that point.
 
 ---
 
@@ -107,7 +138,9 @@ needs it begins, rather than stubbing them out now.
 
 - **RESUME_STRATEGY.md** — the 3–6 base resumes, what role family each is tuned
   for, and the tailoring rules: what an LLM is allowed to rewrite versus what it
-  must leave alone. Never invent experience, employers, dates, or metrics.
+  must leave alone. Never invent experience, employers, dates, or metrics. Base
+  resumes already exist — this document describes what is actually in them. Read the
+  real files first; do not invent a set of role families and work backwards.
 - **DATA_SOURCES.md** — the running list of which ATS and aggregator APIs are wired
   up, their rate limits, and their auth requirements. Endpoint specifics live here,
   not in this file, so they can change without touching the constitution.
@@ -116,18 +149,66 @@ needs it begins, rather than stubbing them out now.
 
 ---
 
+## Decided
+
+- **Targeting and volume** — see Targeting above.
+- **Local-first** — see Stack above.
+- **First sources** — Greenhouse, Lever, and Ashby public JSON APIs, plus one
+  aggregator for breadth. Greenhouse is the priority: it is where a large share of
+  target roles actually post, and its job-board API is documented and public.
+- **Link-only records are acceptable.** When a posting cannot be pulled from a
+  permitted source, a record holding the company and a link to its careers page or job
+  posting is a valid queue entry. Partial coverage beats reaching for a source that
+  isn't permitted.
+
+---
+
 ## Open questions
 
 Unresolved. Do not quietly answer these — they are the founder's to decide.
 
-- Which 3–6 base resumes exist today, and what role family is each tuned for?
-- Target scale: how many companies or roles per week is realistically reviewable
-  alongside an actual job search?
-- Local-only tool, or is a minimal hosted version worth standing up now?
-- Which ATS and aggregator APIs to wire up first? This should be driven by where
-  the target companies actually post. Many startups run Greenhouse, Ashby, or
-  Lever; larger organizations often run Workday, whose public surface is
-  considerably messier.
+**Workday sourcing — Tier 1, deliberately deferred.** Historically most applications
+have gone through Workday, so this is the largest coverage gap and it is not a
+comfortable one to leave open. It stays open anyway, because Workday is the one source
+constraint 3 cannot wave through. Workday career sites expose an undocumented JSON
+endpoint that their own frontend calls; it is not a published public API, and each
+tenant carries the *employer's* terms rather than one central Workday policy — so
+"is this permitted" has a different answer per company. Until this is decided:
+
+> Do not fetch from that endpoint. Workday roles enter the queue as link-only records.
+> Constraint 3 governs — a source whose status is unclear is treated as disallowed
+> until checked.
+
+Build Greenhouse, Lever, and Ashby first. Revisit Workday once the pipeline works and
+the real size of the gap is visible rather than assumed. Two paths are worth weighing
+then: a licensed aggregator that already indexes Workday-posted roles, or a
+per-company allowlist built from each tenant's robots.txt and terms.
+
+**Is 5 per day submitted, or queued for review?** These size the matcher differently —
+if five are meant to be *sent*, more than five need surfacing to allow for rejects.
+Belongs to REVIEW_QUEUE_SPEC.md.
+
+**Which aggregator API** to use for breadth — and whether it also turns out to be the
+legitimate path to Workday-posted roles.
+
+**Whether hosting ever happens.** Revisit only if the local tool earns it.
+
+---
+
+## Deferred features — recorded, not scheduled
+
+Ideas worth keeping, deliberately not built yet. Recorded here so they aren't lost,
+and so nobody starts one thinking it is in scope.
+
+- **Pathway / gap tool** — given a specific company, what a resume would need in order
+  to be competitive there: which skills, projects, or experience are missing.
+- **Alumni finder** — people from the resume's school who work at a target company.
+
+> On the alumni finder specifically: the obvious data source is LinkedIn, and
+> constraint 2 forbids it. That is not a detail to be discovered mid-implementation. If
+> this is ever built, the data has to come from somewhere permitted — the school's own
+> alumni directory or career platform, an opt-in export, or information the founder
+> supplies. If no permitted source exists, the feature doesn't get built.
 
 ---
 
@@ -141,26 +222,36 @@ every session after that.
 I'm building a personal job-search copilot for myself, possibly a product later.
 Read CLAUDE.md — it's the constitution for this project, especially the "no
 unattended submission" and "legitimate data sourcing only" constraints, which are
-non-negotiable.
+non-negotiable. The Targeting, Decided, and Open questions sections are already
+filled in; don't re-ask what's settled there.
 
-Before writing any code, research and propose 2–3 stack options, considering:
+Settled already: local-first, single user, no hosting. Roughly 5 applications a day
+into the review queue. Greenhouse, Lever, and Ashby public JSON APIs first, plus one
+aggregator for breadth. Workday is deferred as an open Tier 1 question — do not
+design around fetching from it. Base resumes exist; read the actual files before
+writing RESUME_STRATEGY.md.
 
-- This is a solo personal tool first. Don't default to the full multi-user-product
-  stack (auth provider, hosted Postgres, separate frontend deploy) unless you can
-  justify why a local-first tool (e.g. a Python CLI/service + SQLite + a simple
-  local web UI) is worse for this use case.
-- Data source integration order: start with 2–3 ATS public JSON APIs (Greenhouse,
-  Lever, Ashby are good first targets — documented, no auth required) plus one
-  aggregator API for broader coverage. Perplexity's Sonar API is for company
-  research and fit-qualification, not for pulling structured listings — don't route
-  the core ingestion through it.
-- The review-queue UX (discover → score → tailor draft → human approves → human
-  submits) is the central mechanic. Propose how that queue should work before
-  touching the matching algorithm itself.
-- Explicitly do NOT implement, scaffold, or leave TODOs for autonomous submission,
-  headless-browser automation against LinkedIn/Indeed/Glassdoor, or any
-  CAPTCHA/bot-detection bypass. If a stack option requires any of that to be
-  useful, reject it and say so.
+What I still need from you, before writing any code:
+
+- Propose 2–3 stack options consistent with local-first — e.g. a Python CLI or small
+  local service plus SQLite and a simple local web UI. If you want to argue for
+  something heavier, justify it against a single user running this on their own
+  machine.
+- Propose how the review queue should work — discover → score → tailor draft → human
+  approves → human submits. This is the central mechanic, so design it before
+  touching the matching algorithm. Cover what a queue entry holds, how link-only
+  entries behave when a posting can't be pulled, and how recency factors into
+  ordering alongside fit.
+- Recommend which aggregator API to start with, and say what it does and doesn't
+  cover.
+
+Perplexity's Sonar API is for company research and fit-qualification, not for pulling
+structured listings — don't route the core ingestion through it.
+
+Explicitly do NOT implement, scaffold, or leave TODOs for autonomous submission,
+headless-browser automation against LinkedIn/Indeed/Glassdoor, or any
+CAPTCHA/bot-detection bypass. If a stack option requires any of that to be useful,
+reject it and say so.
 
 Stay in plan mode until I approve a direction.
 ```
