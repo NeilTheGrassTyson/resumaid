@@ -6,10 +6,13 @@ A personal job-search copilot. It does three things.
 JSON APIs, licensed aggregator APIs, and targeted company research. It does not
 scrape platforms that prohibit scraping.
 
-**Match and tailor.** The user supplies a resume and names a few careers or industries
-they're interested in. The tool parses the resume into a structured profile, scores
-each opening against it, and generates a tailored resume variant and a cover-letter
-draft for the roles that actually fit.
+**Match and tailor.** The user supplies a master resume — the long-form document
+holding everything they have done — and names a few careers or industries they're
+interested in. The tool parses it into a structured profile, scores each opening
+against it, and for the roles that actually fit, cuts a tailored one-page resume and a
+cover-letter draft **for that specific posting**. Tailoring is per-role, not per-industry:
+the master is the single source of truth and each variant is derived from it at queue
+time, rather than the user maintaining a handful of static industry versions.
 
 **Queue, never auto-fire.** Every prepared application lands in a review queue. A
 human reads it, approves it, and submits it. The tool never submits on its own.
@@ -115,8 +118,14 @@ Three rules apply to every search, whoever is running it:
 - **Breadth counts.** Aim for a diverse, thorough set of companies rather than a short
   list of favorites re-checked every day.
 
-Throughput is a user setting, defaulting to roughly **5 applications per day** reaching
-the review queue.
+Throughput is a user setting expressed as applications **submitted** per day, defaulting
+to roughly 5. Because the human rejects some of what's queued, the pipeline has to
+surface more than the target — start near 2–3x and tune it against the observed
+approval rate.
+
+The fit bar does not move to hit that number. If only three roles clear it on a given
+day, three get queued; constraint 5 outranks the throughput setting, and a quota filled
+with low-fit roles is the exact failure this tool exists to avoid.
 
 One clarification, because the wording matters here more than anywhere else in this
 file: the tool automatically **finds and prepares**. It never automatically **sends**.
@@ -150,11 +159,12 @@ every session.
 
 - **BENCHMARK_PROFILE.md** — *exists.* A real job search used as the reference case for
   evaluating the matcher. Read it when working on scoring, ranking, or filtering.
-- **RESUME_STRATEGY.md** — *not yet written.* How an uploaded resume becomes a small set
-  of base variants (3–6, one per role family the user is targeting), and the tailoring
-  rules: what an LLM may rewrite versus what it must leave alone. Never invent
-  experience, employers, dates, or metrics. The rules belong here; any particular
-  user's resumes do not.
+- **RESUME_STRATEGY.md** — *not yet written.* How a master resume becomes a tailored
+  one-pager for a specific posting: what may be dropped, merged, reordered, or reworded,
+  and what must survive untouched. Never invent experience, employers, dates, or metrics
+  — every line in a variant must trace back to a line in the master. The rules belong
+  here; any particular user's resumes do not. BENCHMARK_PROFILE.md has a worked example
+  of the pattern.
 - **DATA_SOURCES.md** — *not yet written.* Which ATS and aggregator APIs are wired up,
   their rate limits, and their auth requirements. Endpoint specifics live here, not in
   this file, so they can change without touching the constitution.
@@ -201,10 +211,6 @@ Build Greenhouse, Lever, and Ashby first. Revisit Workday once the pipeline work
 the real size of the gap is visible rather than assumed. Two paths are worth weighing
 then: a licensed aggregator that already indexes Workday-posted roles, or a
 per-company allowlist built from each tenant's robots.txt and terms.
-
-**Is the daily target submitted, or queued for review?** These size the matcher
-differently — if the target is applications *sent*, more than that need surfacing to
-allow for rejects. Belongs to REVIEW_QUEUE_SPEC.md.
 
 **Which aggregator API** to use for breadth — and whether it also turns out to be the
 legitimate path to Workday-posted roles.
