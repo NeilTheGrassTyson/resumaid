@@ -6,9 +6,10 @@ A personal job-search copilot. It does three things.
 JSON APIs, licensed aggregator APIs, and targeted company research. It does not
 scrape platforms that prohibit scraping.
 
-**Match and tailor.** It scores each opening against a small set of base resumes
-(3–6), then generates a tailored resume variant and a cover-letter draft for the
-roles that actually fit.
+**Match and tailor.** The user supplies a resume and names a few careers or industries
+they're interested in. The tool parses the resume into a structured profile, scores
+each opening against it, and generates a tailored resume variant and a cover-letter
+draft for the roles that actually fit.
 
 **Queue, never auto-fire.** Every prepared application lands in a review queue. A
 human reads it, approves it, and submits it. The tool never submits on its own.
@@ -18,12 +19,16 @@ architectural question that comes up later — what the queue looks like, what g
 stored, which integrations are worth building — resolves against it. See the
 constraints below before proposing anything that touches the submit step.
 
-This is a solo personal tool first and a possible public product later, in that
-order. Prefer the design that is right for one user running it on their own
-machine; do not pre-build for a multi-tenant product that may never exist.
+The tool is **profile-agnostic**. It holds no built-in idea of which roles are worth
+having; it learns that at runtime, from a resume and a handful of declared interests.
+No role family, employer, or industry is hardcoded anywhere in this repository.
+
+That generality is about *whose* search the tool can serve, not about how it is
+deployed. It still runs locally, for one user at a time. Prefer the design that is
+right for one person running this on their own machine; being profile-agnostic is not
+a reason to build multi-tenancy, accounts, or hosted storage.
 
 ---
-
 ## Non-negotiable constraints
 
 These are the principles that don't get traded away for speed. They are meant to
@@ -88,40 +93,48 @@ When it isn't obvious which tier something falls into, treat it as Tier 1.
 
 ---
 
-## Targeting
+## Matching and targeting
 
-What the matcher is aiming at. Role families in priority order:
+Targeting is input, not configuration baked into the repo. Every search starts the
+same way:
 
-1. **Aerospace and defense** — software engineering, or internal AI work. This is the
-   strongest interest, and AI-focused defense startups are the sharpest version of it.
-   Anduril is the gold-standard example of the kind of company meant here.
-2. **Big tech and general software.**
-3. **Finance** — lowest priority. There is little business background to draw on, so
-   these roles need a higher bar to be worth preparing.
+1. **Resume in.** The user supplies one or more resumes. The tool parses them into a
+   structured profile — skills, education and degree level, employers, dates, and the
+   overall shape of the experience.
+2. **Interests in.** The user names a handful of target careers or industries, along
+   with any hard filters that apply: degree level, location, seniority, and so on.
+3. **Matches out.** Openings are scored against the parsed profile and the declared
+   interests together. Low-fit roles are filtered out, not merely ranked low.
 
-Filter roles on degree level, education, and industry interest. Beyond fit, two rules
-shape what surfaces:
+Three rules apply to every search, whoever is running it:
 
+- **Fit filters.** Per constraint 5, the matcher's job is to remove low-fit roles, not
+  to maximize how many applications get prepared.
 - **Recency counts.** A recently posted role ranks above an equally-fitting stale one.
   Applications land better before a posting has collected hundreds of responses.
-- **Breadth counts.** The goal is a diverse, thorough set of companies — not a short
+- **Breadth counts.** Aim for a diverse, thorough set of companies rather than a short
   list of favorites re-checked every day.
 
-Throughput target: roughly **5 applications per day** reaching the review queue.
+Throughput is a user setting, defaulting to roughly **5 applications per day** reaching
+the review queue.
 
 One clarification, because the wording matters here more than anywhere else in this
 file: the tool automatically **finds and prepares**. It never automatically **sends**.
 Nothing in this section modifies constraint 1 — "auto" describes discovery and
 tailoring, never submission.
 
+If a proposed change would only make sense for one particular job search, it belongs
+in a profile, not in the code. See BENCHMARK_PROFILE.md for the reference search used
+to evaluate matcher quality — that file is test data, never defaults.
+
 ---
 
 ## Stack — local-first, specifics not yet chosen
 
-Local-only is decided: this runs on one machine, for one user, with no hosting target.
-A hosted version is a possibility later, if the tool proves itself in daily use — it is
-not something to design toward now, and it is not a reason to reach for a multi-tenant
-architecture today.
+Local-only is decided: this runs on one machine, for one user at a time, with no
+hosting target. A hosted version is a possibility later, if the tool proves itself in
+daily use — it is not something to design toward now, and it is not a reason to reach
+for a multi-tenant architecture today.
 
 The specific backend, storage, and UI are still open. **Do not assume a stack and do
 not begin scaffolding one.** The first plan-mode session proposes two or three options
@@ -130,32 +143,37 @@ decision at that point.
 
 ---
 
-## Situational references (not yet written)
+## Situational references
 
-These don't need to sit in context every session. Open them deliberately when the
-work calls for it. None of them exist yet — create each one when the work that
-needs it begins, rather than stubbing them out now.
+Open these deliberately when the work calls for it, rather than keeping them in context
+every session.
 
-- **RESUME_STRATEGY.md** — the 3–6 base resumes, what role family each is tuned
-  for, and the tailoring rules: what an LLM is allowed to rewrite versus what it
-  must leave alone. Never invent experience, employers, dates, or metrics. Base
-  resumes already exist — this document describes what is actually in them. Read the
-  real files first; do not invent a set of role families and work backwards.
-- **DATA_SOURCES.md** — the running list of which ATS and aggregator APIs are wired
-  up, their rate limits, and their auth requirements. Endpoint specifics live here,
-  not in this file, so they can change without touching the constitution.
-- **REVIEW_QUEUE_SPEC.md** — the UX of the human-approval step. The one piece worth
-  treating as a real spec even at solo scale, per Tier 1 above.
+- **BENCHMARK_PROFILE.md** — *exists.* A real job search used as the reference case for
+  evaluating the matcher. Read it when working on scoring, ranking, or filtering.
+- **RESUME_STRATEGY.md** — *not yet written.* How an uploaded resume becomes a small set
+  of base variants (3–6, one per role family the user is targeting), and the tailoring
+  rules: what an LLM may rewrite versus what it must leave alone. Never invent
+  experience, employers, dates, or metrics. The rules belong here; any particular
+  user's resumes do not.
+- **DATA_SOURCES.md** — *not yet written.* Which ATS and aggregator APIs are wired up,
+  their rate limits, and their auth requirements. Endpoint specifics live here, not in
+  this file, so they can change without touching the constitution.
+- **REVIEW_QUEUE_SPEC.md** — *not yet written.* The UX of the human-approval step. The
+  one piece worth treating as a real spec even at solo scale, per Tier 1 above.
+
+Create the unwritten ones when the work that needs them begins, rather than stubbing
+them out now.
 
 ---
 
 ## Decided
 
-- **Targeting and volume** — see Targeting above.
-- **Local-first** — see Stack above.
+- **Profile-agnostic, local, single-user** — see Project overview and Stack above.
+- **Targeting is runtime input** — resume plus declared interests, per Matching and
+  targeting above.
 - **First sources** — Greenhouse, Lever, and Ashby public JSON APIs, plus one
   aggregator for breadth. Greenhouse is the priority: it is where a large share of
-  target roles actually post, and its job-board API is documented and public.
+  roles actually post, and its job-board API is documented and public.
 - **Link-only records are acceptable.** When a posting cannot be pulled from a
   permitted source, a record holding the company and a link to its careers page or job
   posting is a valid queue entry. Partial coverage beats reaching for a source that
@@ -167,13 +185,13 @@ needs it begins, rather than stubbing them out now.
 
 Unresolved. Do not quietly answer these — they are the founder's to decide.
 
-**Workday sourcing — Tier 1, deliberately deferred.** Historically most applications
-have gone through Workday, so this is the largest coverage gap and it is not a
-comfortable one to leave open. It stays open anyway, because Workday is the one source
-constraint 3 cannot wave through. Workday career sites expose an undocumented JSON
-endpoint that their own frontend calls; it is not a published public API, and each
-tenant carries the *employer's* terms rather than one central Workday policy — so
-"is this permitted" has a different answer per company. Until this is decided:
+**Workday sourcing — Tier 1, deliberately deferred.** Workday is a large share of where
+applications actually get submitted, so this is the biggest coverage gap and it is not
+a comfortable one to leave open. It stays open anyway, because Workday is the one
+source constraint 3 cannot wave through. Workday career sites expose an undocumented
+JSON endpoint that their own frontend calls; it is not a published public API, and each
+tenant carries the *employer's* terms rather than one central Workday policy — so "is
+this permitted" has a different answer per company. Until this is decided:
 
 > Do not fetch from that endpoint. Workday roles enter the queue as link-only records.
 > Constraint 3 governs — a source whose status is unclear is treated as disallowed
@@ -184,9 +202,9 @@ the real size of the gap is visible rather than assumed. Two paths are worth wei
 then: a licensed aggregator that already indexes Workday-posted roles, or a
 per-company allowlist built from each tenant's robots.txt and terms.
 
-**Is 5 per day submitted, or queued for review?** These size the matcher differently —
-if five are meant to be *sent*, more than five need surfacing to allow for rejects.
-Belongs to REVIEW_QUEUE_SPEC.md.
+**Is the daily target submitted, or queued for review?** These size the matcher
+differently — if the target is applications *sent*, more than that need surfacing to
+allow for rejects. Belongs to REVIEW_QUEUE_SPEC.md.
 
 **Which aggregator API** to use for breadth — and whether it also turns out to be the
 legitimate path to Workday-posted roles.
@@ -207,7 +225,7 @@ and so nobody starts one thinking it is in scope.
 > On the alumni finder specifically: the obvious data source is LinkedIn, and
 > constraint 2 forbids it. That is not a detail to be discovered mid-implementation. If
 > this is ever built, the data has to come from somewhere permitted — the school's own
-> alumni directory or career platform, an opt-in export, or information the founder
+> alumni directory or career platform, an opt-in export, or information the user
 > supplies. If no permitted source exists, the feature doesn't get built.
 
 ---
@@ -219,17 +237,19 @@ stack is approved and recorded above, delete this section — it is stale contex
 every session after that.
 
 ```
-I'm building a personal job-search copilot for myself, possibly a product later.
-Read CLAUDE.md — it's the constitution for this project, especially the "no
-unattended submission" and "legitimate data sourcing only" constraints, which are
-non-negotiable. The Targeting, Decided, and Open questions sections are already
-filled in; don't re-ask what's settled there.
+I'm building a job-search copilot — a local tool that takes a resume and a few
+declared interests, finds matching roles, drafts tailored applications, and queues
+them for a human to approve and submit. Read CLAUDE.md first; it's the constitution
+for this project, especially the "no unattended submission" and "legitimate data
+sourcing only" constraints, which are non-negotiable. The Decided and Open questions
+sections are already filled in — don't re-ask what's settled there.
 
-Settled already: local-first, single user, no hosting. Roughly 5 applications a day
-into the review queue. Greenhouse, Lever, and Ashby public JSON APIs first, plus one
-aggregator for breadth. Workday is deferred as an open Tier 1 question — do not
-design around fetching from it. Base resumes exist; read the actual files before
-writing RESUME_STRATEGY.md.
+Settled already: local-first, one user at a time, no hosting. Profile-agnostic — no
+role family or employer is hardcoded; targeting comes from an uploaded resume plus a
+handful of declared interests. Greenhouse, Lever, and Ashby public JSON APIs first,
+plus one aggregator for breadth. Workday is deferred as an open Tier 1 question — do
+not design around fetching from it. BENCHMARK_PROFILE.md holds a real search to
+evaluate the matcher against; treat it as test data, not as defaults.
 
 What I still need from you, before writing any code:
 
@@ -242,6 +262,8 @@ What I still need from you, before writing any code:
   touching the matching algorithm. Cover what a queue entry holds, how link-only
   entries behave when a posting can't be pulled, and how recency factors into
   ordering alongside fit.
+- Propose how a resume gets ingested and turned into a structured profile, and how a
+  user declares their target careers and industries.
 - Recommend which aggregator API to start with, and say what it does and doesn't
   cover.
 
