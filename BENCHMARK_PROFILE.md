@@ -1,7 +1,7 @@
 # Benchmark profile
 
-A real job search, recorded here as the reference case for evaluating the matcher and
-the resume tailoring.
+A real job search, recorded here as the reference case for evaluating the matcher, the
+cover-letter drafter, and — when it gets built — the resume tailoring.
 
 **This file is test data, not configuration.** Nothing in it is a default, and the
 tool must not read it as one. Per CLAUDE.md, the tool is profile-agnostic — targeting
@@ -15,7 +15,18 @@ follows describes structure and behavior only, per constraint 4.
 
 ## The search
 
-**Resume:** the founder's own, supplied at runtime like any other.
+**Resumes:** the founder's own, supplied at runtime like any other. A master plus three
+one-pagers (AI development, software engineering, defense/aerospace). In the MVP these
+are the candidates the tool *selects* among per role; rewriting them is a later phase.
+
+**Locations:** declared at runtime alongside the industry interests, per CLAUDE.md's
+Matching and targeting. Location is a matcher input in the MVP, not a later refinement.
+
+**Writing samples:** general writing — essays, posts, emails — supplied at runtime for
+the cover-letter drafter to learn voice from. Not committed here, same as the resumes.
+Because these aren't cover letters, evaluating stage 2 means asking whether a draft
+sounds like the founder, not whether it reads as a competent cover letter in the
+abstract.
 
 **Role families, in priority order:**
 
@@ -40,6 +51,10 @@ surfacing nothing from the user's primary channel has not actually solved the pr
 ---
 
 ## Resume tailoring: the reference pattern
+
+> **This section is for the Later phase**, per CLAUDE.md's Build order. It is recorded
+> now because the source documents were available now, not because the work is next. The
+> MVP selects among the one-pagers below; it does not produce them.
 
 The founder maintains one master resume plus three hand-tailored one-pagers (AI
 development, software engineering, defense/aerospace), currently produced by prompting
@@ -103,15 +118,19 @@ six of these thirteen earn the space, for this posting."
 
 ## How to use it
 
-**Matching.** Run against this profile and read the surfaced roles as a person would:
-does an aerospace-defense AI role outrank a generic finance one? Does a posting from
-this week outrank an equally-fitting one from two months ago? Are the companies varied,
-or the same handful every run?
+**Matching (MVP stage 1).** Run against this profile and read the surfaced roles as a
+person would: does an aerospace-defense AI role outrank a generic finance one? Does a
+posting from this week outrank an equally-fitting one from two months ago? Are the
+companies varied, or the same handful every run?
 
-**Tailoring.** Feed the master plus a real posting and compare the output against the
-hand-tailored variant for that family. Close is good; identical is not the bar. What
-matters is whether the selection is defensible — did it keep the six bullets a person
-would have kept, and did every line come from the master?
+**Cover letters (MVP stage 2).** Draft against a real posting and read it as someone
+who knows the founder's writing would: does it sound like them, or like a competent
+stranger? A draft that is well-written but generic has failed the actual test.
+
+**Tailoring (Later).** Feed the master plus a real posting and compare the output
+against the hand-tailored variant for that family. Close is good; identical is not the
+bar. What matters is whether the selection is defensible — did it keep the six bullets
+a person would have kept, and did every line come from the master?
 
 A change that makes either result worse is suspect, even if it looks better in the
 abstract.
@@ -119,7 +138,7 @@ abstract.
 ## What it does not prove
 
 This is one person's search, in a narrow set of industries, early in their career, with
-a technical resume. Passing it says the matcher and the tailoring work here — not that
-they generalize. A second profile with a different shape — different field, different
-seniority, a career change, a non-technical resume — would be worth adding before
-trusting either broadly.
+a technical resume and one person's writing voice. Passing it says the matcher, the
+drafter, and the tailoring work here — not that they generalize. A second profile with
+a different shape — different field, different seniority, a career change, a
+non-technical resume — would be worth adding before trusting any of them broadly.

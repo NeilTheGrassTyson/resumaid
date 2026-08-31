@@ -6,13 +6,14 @@ A personal job-search copilot. It does three things.
 JSON APIs, licensed aggregator APIs, and targeted company research. It does not
 scrape platforms that prohibit scraping.
 
-**Match and tailor.** The user supplies a master resume — the long-form document
-holding everything they have done — and names a few careers or industries they're
-interested in. The tool parses it into a structured profile, scores each opening
-against it, and for the roles that actually fit, cuts a tailored one-page resume and a
-cover-letter draft **for that specific posting**. Tailoring is per-role, not per-industry:
-the master is the single source of truth and each variant is derived from it at queue
-time, rather than the user maintaining a handful of static industry versions.
+**Match.** The user supplies their resumes and names the careers, industries, and
+locations they're interested in. The tool parses the resumes into a structured profile,
+scores each opening against it, and filters out the roles that don't fit.
+
+**Draft.** For roles that clear the bar, the tool drafts a cover letter in the user's
+own voice, learned from writing samples they supply. Per-role resume tailoring — cutting
+a master resume down to a one-pager for a specific posting — is the end state, not the
+starting point; see Build order below.
 
 **Queue, never auto-fire.** Every prepared application lands in a review queue. A
 human reads it, approves it, and submits it. The tool never submits on its own.
@@ -96,6 +97,53 @@ When it isn't obvious which tier something falls into, treat it as Tier 1.
 
 ---
 
+## Build order
+
+Three stages. Only the first is the MVP; the rest wait their turn.
+
+### MVP — the job-application side
+
+**Stage 1: discover, match, queue.** Pull openings from permitted sources, score them
+against the profile and declared interests, and put what clears the bar into the review
+queue. The user reads, approves, and submits. That is the whole loop minus the writing,
+and it is the thing worth having working first.
+
+Resumes in the MVP are handled by **selection, not tailoring**: the user uploads the
+resumes they already maintain, and the tool names the best-fitting one on each queue
+entry. Choosing among documents the user wrote is not the tailoring engine, needs none
+of its machinery, and carries most of the day-one value.
+
+**Stage 2: cover letters.** Draft a letter per queued role in the user's own voice,
+learned from writing samples they supply.
+
+The objective is **voice fidelity** — a letter that reads as something this person
+wrote, which it substantially is: the experience is theirs and they approve every letter
+before it goes anywhere. That is what to build for and evaluate against.
+
+Not a build target: testing drafts against AI-detection services, or tuning output to
+score below their thresholds. Two reasons, both practical. Those detectors are noisy,
+disagree with each other, and change without notice, so anything fitted to them rots
+immediately and silently. And the letter you get by chasing voice fidelity is the same
+letter, arrived at in a way that stays true as the tools change. Build for voice.
+
+Because the samples on hand are general writing rather than cover letters, the tool has
+to separate this person's voice from the conventions of the genre — expect that to want
+more sample text than voice-matching normally would. Evaluate on whether a letter sounds
+like the user, not on whether it sounds unlike a machine.
+
+### Later — resume review, then per-role tailoring
+
+A review function over the user's existing resumes (what is weak, what a given posting
+wants that isn't there), followed by the master-resume-to-one-pager tailoring described
+in Matching and targeting. BENCHMARK_PROFILE.md holds the worked example.
+
+This is last on purpose. It is the largest piece, it is worth building well rather than
+quickly, and the queue is genuinely useful without it.
+
+Nothing in this order touches the constraints. Stage 1 queues; it never submits.
+
+---
+
 ## Matching and targeting
 
 Targeting is input, not configuration baked into the repo. Every search starts the
@@ -104,8 +152,11 @@ same way:
 1. **Resume in.** The user supplies one or more resumes. The tool parses them into a
    structured profile — skills, education and degree level, employers, dates, and the
    overall shape of the experience.
-2. **Interests in.** The user names a handful of target careers or industries, along
-   with any hard filters that apply: degree level, location, seniority, and so on.
+2. **Interests in.** The user declares what they're looking for: target careers or
+   industries, and the locations they'll work in — remote, specific metros, or a
+   willingness to relocate. Plus any hard filters that apply: degree level, seniority,
+   clearance eligibility, and so on. Industry and location are first-class inputs to the
+   matcher, not post-hoc filters on a generic result set.
 3. **Matches out.** Openings are scored against the parsed profile and the declared
    interests together. Low-fit roles are filtered out, not merely ranked low.
 
@@ -158,18 +209,24 @@ Open these deliberately when the work calls for it, rather than keeping them in 
 every session.
 
 - **BENCHMARK_PROFILE.md** — *exists.* A real job search used as the reference case for
-  evaluating the matcher. Read it when working on scoring, ranking, or filtering.
-- **RESUME_STRATEGY.md** — *not yet written.* How a master resume becomes a tailored
-  one-pager for a specific posting: what may be dropped, merged, reordered, or reworded,
-  and what must survive untouched. Never invent experience, employers, dates, or metrics
-  — every line in a variant must trace back to a line in the master. The rules belong
-  here; any particular user's resumes do not. BENCHMARK_PROFILE.md has a worked example
-  of the pattern.
+  evaluating the matcher and the cover-letter drafter. Read it when working on scoring,
+  ranking, filtering, or voice.
+- **REVIEW_QUEUE_SPEC.md** — *not yet written, needed first.* The UX of the
+  human-approval step: what a queue entry holds, how link-only entries behave, how
+  recency and fit combine in the ordering. The one piece worth treating as a real spec
+  even at solo scale, per Tier 1 above — and the MVP's central mechanic.
+- **COVER_LETTER_VOICE.md** — *not yet written, MVP stage 2.* How writing samples become
+  a voice model, and what the drafter may and may not do with the user's experience.
+  Same rule as resume tailoring: nothing invented, every claim traceable.
+- **RESUME_STRATEGY.md** — *not yet written, Later phase.* How a master resume becomes
+  a tailored one-pager for a specific posting: what may be dropped, merged, reordered,
+  or reworded, and what must survive untouched. Never invent experience, employers,
+  dates, or metrics — every line in a variant must trace back to a line in the master.
+  The rules belong here; any particular user's resumes do not. BENCHMARK_PROFILE.md has
+  a worked example of the pattern.
 - **DATA_SOURCES.md** — *not yet written.* Which ATS and aggregator APIs are wired up,
   their rate limits, and their auth requirements. Endpoint specifics live here, not in
   this file, so they can change without touching the constitution.
-- **REVIEW_QUEUE_SPEC.md** — *not yet written.* The UX of the human-approval step. The
-  one piece worth treating as a real spec even at solo scale, per Tier 1 above.
 
 Create the unwritten ones when the work that needs them begins, rather than stubbing
 them out now.
@@ -184,6 +241,8 @@ them out now.
 - **First sources** — Greenhouse, Lever, and Ashby public JSON APIs, plus one
   aggregator for breadth. Greenhouse is the priority: it is where a large share of
   roles actually post, and its job-board API is documented and public.
+- **Build order** — MVP is the job-application side plus cover letters; resume review
+  and per-role tailoring come after. See Build order above.
 - **Link-only records are acceptable.** When a posting cannot be pulled from a
   permitted source, a record holding the company and a link to its careers page or job
   posting is a valid queue entry. Partial coverage beats reaching for a source that
@@ -244,32 +303,36 @@ every session after that.
 
 ```
 I'm building a job-search copilot — a local tool that takes a resume and a few
-declared interests, finds matching roles, drafts tailored applications, and queues
-them for a human to approve and submit. Read CLAUDE.md first; it's the constitution
+declared interests, finds matching roles, drafts a cover letter, and queues each
+application for me to approve and submit. Read CLAUDE.md first; it's the constitution
 for this project, especially the "no unattended submission" and "legitimate data
-sourcing only" constraints, which are non-negotiable. The Decided and Open questions
-sections are already filled in — don't re-ask what's settled there.
+sourcing only" constraints, which are non-negotiable. The Build order, Decided, and
+Open questions sections are already filled in — don't re-ask what's settled there.
+
+Scope for this first pass is the MVP in Build order, and nothing beyond it: discover →
+score → queue → I approve → I submit, plus a cover-letter drafter. Resume review and
+per-role tailoring are explicitly later; don't design around them, and don't scaffold
+them. Resumes in the MVP are selected, not rewritten.
 
 Settled already: local-first, one user at a time, no hosting. Profile-agnostic — no
-role family or employer is hardcoded; targeting comes from an uploaded resume plus a
-handful of declared interests. Greenhouse, Lever, and Ashby public JSON APIs first,
-plus one aggregator for breadth. Workday is deferred as an open Tier 1 question — do
-not design around fetching from it. BENCHMARK_PROFILE.md holds a real search to
-evaluate the matcher against; treat it as test data, not as defaults.
+role family or employer is hardcoded; targeting comes from uploaded resumes plus
+declared careers, industries, and locations. Greenhouse, Lever, and Ashby public JSON
+APIs first, plus one aggregator for breadth. Workday is deferred as an open Tier 1
+question — do not design around fetching from it. BENCHMARK_PROFILE.md holds a real
+search to evaluate the matcher against; treat it as test data, not as defaults.
 
-What I still need from you, before writing any code:
+What I need from you, before writing any code:
 
 - Propose 2–3 stack options consistent with local-first — e.g. a Python CLI or small
   local service plus SQLite and a simple local web UI. If you want to argue for
   something heavier, justify it against a single user running this on their own
   machine.
-- Propose how the review queue should work — discover → score → tailor draft → human
-  approves → human submits. This is the central mechanic, so design it before
-  touching the matching algorithm. Cover what a queue entry holds, how link-only
-  entries behave when a posting can't be pulled, and how recency factors into
-  ordering alongside fit.
-- Propose how a resume gets ingested and turned into a structured profile, and how a
-  user declares their target careers and industries.
+- Propose how the review queue should work. This is the MVP's central mechanic, so
+  design it before touching the matching algorithm: what a queue entry holds, how
+  link-only entries behave when a posting can't be pulled, how recency and fit combine
+  in the ordering, and what the approve/reject/submit step actually looks like.
+- Propose how resumes and interests get ingested — parsing a resume into a structured
+  profile, and how I declare target careers, industries, and locations.
 - Recommend which aggregator API to start with, and say what it does and doesn't
   cover.
 
