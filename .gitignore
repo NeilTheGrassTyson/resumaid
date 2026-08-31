@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+
+node_modules/
+ui/dist/
+
+# Never commit user data. The real store lives at ~/.resumaid, outside the repo;
+# these guard against an accidental local copy. Constraint 4.
+.resumaid/
+*.db
+resumes/
+*.pdf
+*.docx
+secrets.env
+.env
