@@ -1,0 +1,32 @@
+{
+  "SearchResult": {
+    "SearchResultCount": 1,
+    "SearchResultItems": [
+      {
+        "MatchedObjectId": "830012345",
+        "MatchedObjectDescriptor": {
+          "PositionID": "AF-26-0012345",
+          "PositionTitle": "Computer Scientist",
+          "OrganizationName": "Air Force Research Laboratory",
+          "DepartmentName": "Department of the Air Force",
+          "PositionURI": "https://www.usajobs.gov/job/830012345",
+          "ApplyURI": ["https://www.usajobs.gov/job/830012345/apply"],
+          "PositionLocation": [{"LocationName": "Wright-Patterson AFB, Ohio"}],
+          "PositionSchedule": [{"Name": "Full-Time"}],
+          "PositionRemuneration": [
+            {"MinimumRange": "86962", "MaximumRange": "134435", "RateIntervalCode": "PA"}
+          ],
+          "PublicationStartDate": "2026-08-18",
+          "ApplicationCloseDate": "2026-09-18",
+          "QualificationSummary": "Degree in computer science required.",
+          "UserArea": {
+            "Details": {
+              "JobSummary": "Research autonomy and machine learning for USAF systems.",
+              "MajorDuties": ["Develop algorithms.", "Publish findings."]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

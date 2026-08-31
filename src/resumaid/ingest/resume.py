@@ -231,30 +231,49 @@ def parse_profile(texts: dict[str, str]) -> Profile:
     return profile
 
 
-#: Words too common in any resume to say anything about a document's emphasis.
+#: Words too common in any resume to say anything about a document's emphasis. Three groups:
+#: ordinary filler, resume-structural vocabulary (every resume has an "Education" section, so
+#: the word carries no signal), and dates.
 _STOP = {
+    # filler
     "and", "the", "for", "with", "from", "that", "this", "using", "used", "our", "was", "were",
     "have", "has", "had", "will", "would", "into", "over", "under", "team", "work", "worked",
     "role", "years", "year", "including", "across", "within", "also", "new", "use", "developed",
-    "built", "designed", "created", "implemented", "responsible", "experience",
+    "built", "designed", "created", "implemented", "responsible", "via", "per", "such",
+    # resume structure — present in every document, so it distinguishes none of them
+    "education", "experience", "skills", "skill", "projects", "project", "summary", "objective",
+    "activities", "awards", "honors", "certifications", "coursework", "relevant", "interests",
+    "languages", "tools", "technologies", "technical", "professional", "employment", "history",
+    "university", "college", "school", "institute", "bachelor", "bachelors", "master", "masters",
+    "degree", "gpa", "minor", "major", "present", "current", "graduated", "expected",
+    # dates
+    "january", "february", "march", "april", "may", "june", "july", "august", "september",
+    "october", "november", "december", "jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep",
+    "sept", "oct", "nov", "dec",
 }
 
 
-def extract_emphasis(text: str, limit: int = 25) -> tuple[list[str], str]:
+def extract_emphasis(
+    text: str, limit: int = 25, *, exclude: set[str] | None = None
+) -> tuple[list[str], str]:
     """What this document leads with.
 
     Term frequency, weighted toward the first third of the page — a resume puts what it wants
     read first at the top. This is how the tool picks *which* document to send; it never
     rewrites one.
+
+    ``exclude`` drops terms that carry no signal for *this* document — the candidate's own name
+    appears in all of their resumes, so it cannot distinguish between them.
     """
     words = re.findall(r"[A-Za-z][A-Za-z+#./-]{2,}", text)
     if not words:
         return [], ""
+    skip = _STOP | (exclude or set())
     cutoff = max(1, len(words) // 3)
     scores: dict[str, float] = {}
     for i, raw in enumerate(words):
         word = raw.lower().strip("./-")
-        if len(word) < 3 or word in _STOP:
+        if len(word) < 3 or word in skip:
             continue
         scores[word] = scores.get(word, 0.0) + (2.0 if i < cutoff else 1.0)
     ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
@@ -271,7 +290,9 @@ def add_resume(conn: sqlite3.Connection, path: Path, *, is_master: bool = False)
     if not text.strip():
         raise ValueError(f"no text extracted from {path.name} (is it a scanned image?)")
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    terms, summary = extract_emphasis(text)
+    # The candidate's own name is in every one of their resumes, so it distinguishes none.
+    parsed_name = parse_profile({path.name: text}).name or ""
+    terms, summary = extract_emphasis(text, exclude=set(parsed_name.lower().split()))
     conn.execute(
         """INSERT INTO resumes (filename, path, added_at, text_sha256, raw_text,
                                 emphasis_terms, emphasis_summary, is_master)

@@ -42,6 +42,12 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+[tool.ruff.lint.per-file-ignores]
+# Typer and FastAPI express their interfaces through calls in argument defaults; B008 is a
+# false positive against both.
+"src/resumaid/cli.py" = ["B008"]
+"src/resumaid/api/*.py" = ["B008"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

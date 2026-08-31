@@ -98,10 +98,18 @@ def jload(value: str | None, default: object = None):
 
 
 def html_to_text(html: str) -> str:
-    """Strip tags from an ATS description. Good enough for scoring and display."""
+    """Strip tags from an ATS description. Good enough for scoring and display.
+
+    Greenhouse returns its ``content`` field with the markup entity-escaped (``&lt;p&gt;``
+    rather than ``<p>``), so unescaping has to happen *before* tags are stripped — otherwise
+    the escaped tags survive stripping and land in the text as literal ``<p>``.
+    """
     import html as html_mod
 
-    s = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html or "")
+    s = html or ""
+    if "&lt;" in s or "&gt;" in s:
+        s = html_mod.unescape(s)
+    s = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", s)
     s = re.sub(r"(?i)<br\s*/?>", "\n", s)
     s = re.sub(r"(?i)</(p|div|li|h[1-6]|tr)>", "\n", s)
     s = re.sub(r"(?i)<li[^>]*>", "• ", s)
