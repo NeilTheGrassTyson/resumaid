@@ -25,7 +25,10 @@ def _apply_pragmas(conn: sqlite3.Connection) -> None:
 def connect(db_path: Path | None = None, *, migrate_on_connect: bool = True) -> sqlite3.Connection:
     path = db_path or paths().ensure().db
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, isolation_level=None)
+    # check_same_thread=False because FastAPI runs sync route handlers in a threadpool, so a
+    # connection is opened on one thread and used on another. Safe here: get_db() hands out a
+    # fresh connection per request, and WAL plus busy_timeout covers the reader/writer overlap.
+    conn = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     _apply_pragmas(conn)
     if migrate_on_connect:

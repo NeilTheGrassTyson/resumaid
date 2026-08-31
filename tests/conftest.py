@@ -37,3 +37,37 @@ def posting():
         return RawPosting(**base)
 
     return make
+
+
+@pytest.fixture
+def client(db, tmp_path, monkeypatch):
+    """A TestClient wired to the per-test database and data directory."""
+    import warnings
+
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    from fastapi.testclient import TestClient
+
+    from resumaid.api import deps
+    from resumaid.api.app import app
+    from resumaid.ingest.interests import save_interests, save_profile
+    from resumaid.models import HardFilters, Interests, LocationPrefs, Profile, RoleFamily
+
+    save_profile(
+        Profile(skills=["Python", "C++", "Kubernetes"], highest_degree_level="bachelors"),
+        tmp_path / "profile.yaml",
+    )
+    save_interests(
+        Interests(
+            role_families=[
+                RoleFamily(name="software", weight=1.0,
+                           keywords=["software", "engineer", "flight", "platform"])
+            ],
+            locations=LocationPrefs(remote=True, metros=["Boston, MA"], relocation="willing"),
+            hard_filters=HardFilters(),
+        ),
+        tmp_path / "interests.yaml",
+    )
+
+    app.dependency_overrides[deps.get_db] = lambda: db
+    yield TestClient(app)
+    app.dependency_overrides.clear()

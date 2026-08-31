@@ -20,3 +20,6 @@ resumes/
 *.docx
 secrets.env
 .env
+
+# Generated from the FastAPI app at build time; ui/src/api/types.ts is committed, this is not.
+openapi.json

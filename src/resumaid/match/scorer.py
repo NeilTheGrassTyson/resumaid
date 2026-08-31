@@ -79,9 +79,13 @@ def score_skills(posting: RawPosting, profile: Profile) -> DimensionScore:
     ratio = min(1.0, len(hits) / 8.0)
     score = 30.0 + 70.0 * ratio
     shown = ", ".join(hits[:8])
+    # "only" when the overlap is thin, so the sentence reads as the deficit it is when this
+    # dimension turns up in the missing-signals list.
+    qualifier = "only " if len(hits) <= 2 else ""
+    verb = "appears" if len(hits) == 1 else "appear"
     return DimensionScore(
         name="skills", score=score, weight=3.0,
-        evidence=f"{len(hits)} of your skills appear: {shown}",
+        evidence=f"{qualifier}{len(hits)} of your skills {verb}: {shown}",
     )
 
 
@@ -215,7 +219,13 @@ def score(
         score_industry(posting, interests),
     ]
     matched = [d.evidence for d in dims if d.score >= 70]
-    missing = [d.evidence for d in dims if d.score < 40]
+    # Name the dimension and its score in the missing list: the evidence string alone is
+    # phrased as a statement of fact, which reads oddly under a "what's missing" heading.
+    missing = [
+        f"{d.name.replace('_', ' ')} ({d.score:.0f}/100) — {d.evidence}"
+        for d in dims
+        if d.score < 40
+    ]
     if posting.description_text is None:
         missing.append("no description available — scored on title and company alone")
     return ScoreBreakdown(
