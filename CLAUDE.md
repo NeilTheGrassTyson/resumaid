@@ -189,17 +189,20 @@ to evaluate matcher quality — that file is test data, never defaults.
 
 ---
 
-## Stack — local-first, specifics not yet chosen
+## Stack — decided
 
-Local-only is decided: this runs on one machine, for one user at a time, with no
-hosting target. A hosted version is a possibility later, if the tool proves itself in
-daily use — it is not something to design toward now, and it is not a reason to reach
-for a multi-tenant architecture today.
+Local-only: this runs on one machine, for one user at a time, with no hosting target. A
+hosted version is a possibility later, if the tool proves itself in daily use — it is not
+something to design toward now, and it is not a reason to reach for a multi-tenant
+architecture today.
 
-The specific backend, storage, and UI are still open. **Do not assume a stack and do
-not begin scaffolding one.** The first plan-mode session proposes two or three options
-consistent with local-first, and the founder picks one; this section records the
-decision at that point.
+**Python 3.11+ (`uv`), SQLite, FastAPI, React + Vite.** Explicit SQL with numbered
+migrations, Pydantic models, `typer` CLI, and a keyboard-driven SPA the API serves itself,
+so daily use is one command bound to localhost. Every mutating API route has a CLI twin
+calling the same service function.
+
+Rationale and the options it beat are in `docs/adr/0002-local-first-stack.md`. Endpoint
+specifics live in `DATA_SOURCES.md`.
 
 ---
 
@@ -211,10 +214,10 @@ every session.
 - **BENCHMARK_PROFILE.md** — *exists.* A real job search used as the reference case for
   evaluating the matcher and the cover-letter drafter. Read it when working on scoring,
   ranking, filtering, or voice.
-- **REVIEW_QUEUE_SPEC.md** — *not yet written, needed first.* The UX of the
-  human-approval step: what a queue entry holds, how link-only entries behave, how
-  recency and fit combine in the ordering. The one piece worth treating as a real spec
-  even at solo scale, per Tier 1 above — and the MVP's central mechanic.
+- **REVIEW_QUEUE_SPEC.md** — *exists.* The UX of the human-approval step: what a queue
+  entry holds, the state machine and the three layers that keep constraint 1 structural,
+  how link-only entries behave, how recency and fit combine in the ordering. The MVP's
+  central mechanic; read it before changing anything in the queue.
 - **COVER_LETTER_VOICE.md** — *not yet written, MVP stage 2.* How writing samples become
   a voice model, and what the drafter may and may not do with the user's experience.
   Same rule as resume tailoring: nothing invented, every claim traceable.
@@ -224,9 +227,14 @@ every session.
   dates, or metrics — every line in a variant must trace back to a line in the master.
   The rules belong here; any particular user's resumes do not. BENCHMARK_PROFILE.md has
   a worked example of the pattern.
-- **DATA_SOURCES.md** — *not yet written.* Which ATS and aggregator APIs are wired up,
-  their rate limits, and their auth requirements. Endpoint specifics live here, not in
-  this file, so they can change without touching the constitution.
+- **DATA_SOURCES.md** — *exists.* Which ATS and aggregator APIs are wired up, their rate
+  limits, auth requirements, and the basis on which each is permitted — plus why Workday
+  and the scraped-index aggregators are absent. Endpoint specifics live here, not in this
+  file, so they can change without touching the constitution.
+- **docs/adr/** — *exists.* One file per implementation decision, each recording the
+  alternatives it beat and why. These sit *beneath* this file: an ADR may explain how a
+  constraint is enforced, never trade one away. Read the relevant one before reversing a
+  design choice — it probably says why.
 
 Create the unwritten ones when the work that needs them begins, rather than stubbing
 them out now.
@@ -247,6 +255,11 @@ them out now.
   permitted source, a record holding the company and a link to its careers page or job
   posting is a valid queue entry. Partial coverage beats reaching for a source that
   isn't permitted.
+- **Aggregators — Adzuna and USAJobs.** Adzuna for breadth (snippets only, so its entries
+  need a pasted description to reach full confidence); USAJobs for the federal lane, where
+  the permitted status is not in any doubt. Neither closes the Workday gap. See
+  `DATA_SOURCES.md`.
+- **Stack** — see Stack above.
 
 ---
 
@@ -271,9 +284,6 @@ the real size of the gap is visible rather than assumed. Two paths are worth wei
 then: a licensed aggregator that already indexes Workday-posted roles, or a
 per-company allowlist built from each tenant's robots.txt and terms.
 
-**Which aggregator API** to use for breadth — and whether it also turns out to be the
-legitimate path to Workday-posted roles.
-
 **Whether hosting ever happens.** Revisit only if the local tool earns it.
 
 ---
@@ -292,57 +302,3 @@ and so nobody starts one thinking it is in scope.
 > this is ever built, the data has to come from somewhere permitted — the school's own
 > alumni directory or career platform, an opt-in export, or information the user
 > supplies. If no permitted source exists, the feature doesn't get built.
-
----
-
-## Bootstrap — remove this section once the stack decision lands
-
-One-time kickoff prompt. Paste it in plan mode, before any code is written. Once a
-stack is approved and recorded above, delete this section — it is stale context
-every session after that.
-
-```
-I'm building a job-search copilot — a local tool that takes a resume and a few
-declared interests, finds matching roles, drafts a cover letter, and queues each
-application for me to approve and submit. Read CLAUDE.md first; it's the constitution
-for this project, especially the "no unattended submission" and "legitimate data
-sourcing only" constraints, which are non-negotiable. The Build order, Decided, and
-Open questions sections are already filled in — don't re-ask what's settled there.
-
-Scope for this first pass is the MVP in Build order, and nothing beyond it: discover →
-score → queue → I approve → I submit, plus a cover-letter drafter. Resume review and
-per-role tailoring are explicitly later; don't design around them, and don't scaffold
-them. Resumes in the MVP are selected, not rewritten.
-
-Settled already: local-first, one user at a time, no hosting. Profile-agnostic — no
-role family or employer is hardcoded; targeting comes from uploaded resumes plus
-declared careers, industries, and locations. Greenhouse, Lever, and Ashby public JSON
-APIs first, plus one aggregator for breadth. Workday is deferred as an open Tier 1
-question — do not design around fetching from it. BENCHMARK_PROFILE.md holds a real
-search to evaluate the matcher against; treat it as test data, not as defaults.
-
-What I need from you, before writing any code:
-
-- Propose 2–3 stack options consistent with local-first — e.g. a Python CLI or small
-  local service plus SQLite and a simple local web UI. If you want to argue for
-  something heavier, justify it against a single user running this on their own
-  machine.
-- Propose how the review queue should work. This is the MVP's central mechanic, so
-  design it before touching the matching algorithm: what a queue entry holds, how
-  link-only entries behave when a posting can't be pulled, how recency and fit combine
-  in the ordering, and what the approve/reject/submit step actually looks like.
-- Propose how resumes and interests get ingested — parsing a resume into a structured
-  profile, and how I declare target careers, industries, and locations.
-- Recommend which aggregator API to start with, and say what it does and doesn't
-  cover.
-
-Perplexity's Sonar API is for company research and fit-qualification, not for pulling
-structured listings — don't route the core ingestion through it.
-
-Explicitly do NOT implement, scaffold, or leave TODOs for autonomous submission,
-headless-browser automation against LinkedIn/Indeed/Glassdoor, or any
-CAPTCHA/bot-detection bypass. If a stack option requires any of that to be useful,
-reject it and say so.
-
-Stay in plan mode until I approve a direction.
-```
