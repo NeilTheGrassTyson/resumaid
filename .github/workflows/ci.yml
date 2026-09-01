@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv pip install --system -e '.[dev,xlsx]'
+
+      - name: Lint
+        run: ruff check src tests
+
+      - name: Test
+        # The live marker hits real public boards; it is opt-in and never runs in CI.
+        run: pytest -m "not live"
+
+      - name: Constraint 1 must hold
+        # Redundant with the run above, and deliberately so: if these ever fail, the failure
+        # should name itself rather than being one line in a longer log. See ADR 0003.
+        run: pytest tests/test_constraint_one.py tests/test_llm_payload.py -q
+
+  ui:
+    name: UI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Python (for the OpenAPI schema)
+        run: uv pip install --system -e '.[dev]'
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Typecheck and build
+        working-directory: ui
+        run: npm run build
+
+      - name: API types are not stale
+        # ui/src/api/types.ts is generated from the FastAPI schema. If a route changes and the
+        # types are not regenerated, the SPA compiles against a contract the server no longer
+        # honors — so regenerate here and fail on any diff.
+        run: |
+          python -c "
+          import json
+          from resumaid.api.app import app
+          json.dump(app.openapi(), open('openapi.json', 'w'), indent=2)
+          "
+          cd ui && npm run types
+          if ! git diff --exit-code --stat -- src/api/types.ts; then
+            echo "::error::ui/src/api/types.ts is out of date. Run 'npm run types' in ui/ and commit the result."
+            git diff -- src/api/types.ts | head -60
+            exit 1
+          fi

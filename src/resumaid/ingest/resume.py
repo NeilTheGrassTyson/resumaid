@@ -22,13 +22,23 @@ from resumaid.util import iso, jdump, jload, utcnow
 
 SUPPORTED = {".pdf", ".docx", ".md", ".txt"}
 
-_DEGREE_LEVELS = [
-    ("doctorate", r"\b(ph\.?d|doctorate|doctoral|d\.?phil)\b"),
-    ("masters", r"\b(m\.?s\.?c?|master'?s?|m\.?eng|m\.?b\.?a|m\.?a)\b"),
-    ("bachelors", r"\b(b\.?s\.?c?|bachelor'?s?|b\.?eng|b\.?a|b\.?tech)\b"),
-    ("associate", r"\b(a\.?a\.?s?|associate'?s? degree)\b"),
-    ("highschool", r"\b(high school diploma|g\.?e\.?d)\b"),
+#: Unambiguous degree markers: spelled out, or abbreviated with periods.
+_DEGREE_STRONG = [
+    ("doctorate", r"\b(ph\.?\s?d\.?|doctorate|doctoral|d\.?phil)\b"),
+    ("masters", r"\b(master'?s?|m\.s\.?|m\.a\.|m\.b\.a\.?|mba|m\.?eng\b|msc)\b"),
+    ("bachelors", r"\b(bachelor'?s?|b\.s\.?|b\.a\.|b\.?eng\b|bsc|b\.?tech)\b"),
+    ("associate", r"\b(associate'?s? degree|a\.a\.s?\.?)\b"),
+    ("highschool", r"\b(high school diploma|g\.?e\.?d\.?)\b"),
 ]
+
+#: Bare two-letter abbreviations, which collide with state codes — "Boston, MA" is not a
+#: master's degree, and "Jackson, MS" is not one either. These only count with degree context
+#: around them, e.g. "BS in Computer Science" or "MS, Electrical Engineering".
+_DEGREE_WEAK = [
+    ("masters", r"\bM\.?S\.?(?:c)?\b|\bM\.?A\.?\b"),
+    ("bachelors", r"\bB\.?S\.?(?:c)?\b|\bB\.?A\.?\b"),
+]
+_DEGREE_CONTEXT = r"(?:\s*(?:in|of)\b|\s*,\s*[A-Z]|\s+degree\b)"
 DEGREE_ORDER = ["highschool", "associate", "bachelors", "masters", "doctorate"]
 
 _SECTIONS = {
@@ -126,7 +136,15 @@ def parse_skills(section: list[str]) -> list[str]:
 
 
 def detect_degree_level(text: str) -> str | None:
-    found = [level for level, pattern in _DEGREE_LEVELS if re.search(pattern, text, re.I)]
+    """The highest degree the text evidences.
+
+    Bare two-letter abbreviations need degree context, because they collide with state codes:
+    without that, every resume with a Massachusetts address claims a master's.
+    """
+    found = [level for level, pattern in _DEGREE_STRONG if re.search(pattern, text, re.I)]
+    for level, pattern in _DEGREE_WEAK:
+        if re.search(f"(?:{pattern}){_DEGREE_CONTEXT}", text):
+            found.append(level)
     if not found:
         return None
     return max(found, key=lambda lvl: DEGREE_ORDER.index(lvl))

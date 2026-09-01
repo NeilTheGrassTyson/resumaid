@@ -536,6 +536,15 @@ export interface components {
              * @default true
              */
             remote: boolean;
+            /** Home */
+            home?: string | null;
+            /**
+             * Max Distance Miles
+             * @default 50
+             */
+            max_distance_miles: number | null;
+            /** Places */
+            places?: components["schemas"]["PlacePref"][];
             /** Metros */
             metros?: string[];
             /**
@@ -562,6 +571,24 @@ export interface components {
         PasteIn: {
             /** Text */
             text: string;
+        };
+        /**
+         * PlacePref
+         * @description One place or state you're interested in, and how much.
+         *
+         *     Weight works the way `RoleFamily.weight` does, so "how much do I want this" has a single
+         *     meaning across the whole config.
+         */
+        PlacePref: {
+            /** Place */
+            place?: string | null;
+            /** State */
+            state?: string | null;
+            /**
+             * Weight
+             * @default 1
+             */
+            weight: number;
         };
         /**
          * Profile
