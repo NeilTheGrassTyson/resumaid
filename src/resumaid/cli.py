@@ -338,6 +338,21 @@ def queue_snooze(entry_id: int, days: int = typer.Option(3)) -> None:
     console.print(f"Snoozed #{entry_id} for {days}d")
 
 
+@queue_app.command("unapprove")
+def queue_unapprove(entry_id: int) -> None:
+    """Send an approved entry back to the queue — the 'I changed my mind' path.
+
+    Nothing is recorded as sent, because approving never sent anything.
+    """
+    conn = _db()
+    try:
+        queue_store.unapprove(conn, entry_id)
+    except (LookupError, ValueError, PermissionError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    console.print(f"#{entry_id} is back in the queue")
+
+
 @queue_app.command("paste")
 def queue_paste(
     entry_id: int,
