@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class Source(StrEnum):
@@ -219,8 +219,37 @@ class RoleFamily(BaseModel):
     min_fit: float | None = None  # per-family floor; reachable, but held to a higher bar
 
 
+class PlacePref(BaseModel):
+    """One place or state you're interested in, and how much.
+
+    Weight works the way `RoleFamily.weight` does, so "how much do I want this" has a single
+    meaning across the whole config.
+    """
+
+    place: str | None = None
+    state: str | None = None
+    weight: float = 1.0
+
+    @model_validator(mode="after")
+    def _exactly_one_target(self) -> PlacePref:
+        if bool(self.place) == bool(self.state):
+            raise ValueError("a location preference needs exactly one of `place` or `state`")
+        return self
+
+    @property
+    def label(self) -> str:
+        return self.place or (self.state or "")
+
+
 class LocationPrefs(BaseModel):
     remote: bool = True
+    #: Where you are now. Defaults to the location parsed from your resume; set it to override.
+    home: str | None = None
+    #: Anything within this many miles of home counts as local. None disables proximity scoring.
+    max_distance_miles: float | None = 50.0
+    #: Weighted places and states.
+    places: list[PlacePref] = Field(default_factory=list)
+    #: Legacy plain list, kept working: each entry is treated as a place at full weight.
     metros: list[str] = Field(default_factory=list)
     relocation: str = "no"  # no | willing | preferred
 
@@ -232,6 +261,14 @@ class LocationPrefs(BaseModel):
         if isinstance(v, bool):
             return "willing" if v else "no"
         return v
+
+    def all_places(self) -> list[PlacePref]:
+        """Weighted preferences, with the legacy `metros` list folded in at full weight."""
+        return [*self.places, *(PlacePref(place=m, weight=1.0) for m in self.metros if m)]
+
+    @property
+    def will_relocate(self) -> bool:
+        return self.relocation in {"willing", "preferred"}
 
 
 class HardFilters(BaseModel):

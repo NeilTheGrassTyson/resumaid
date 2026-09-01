@@ -48,6 +48,29 @@ Ranking is `fit × recency × confidence`. Recency reorders comparable roles but
 can overcome a fit gap of about 33%, never more. A per-company cap keeps one employer from
 filling the slate.
 
+**Location** is a real input, not a keyword match. Your home comes from your resume's contact
+block (override it with `locations.home`), and a bundled table of 1,000 US places gives actual
+distances — so a role 41 miles away scores like the commute it is even if it's over a state
+line. Name cities and states with weights, the way role families work:
+
+```yaml
+locations:
+  remote: true
+  home: "Boston, MA"        # defaults to whatever your resume says
+  max_distance_miles: 50    # inside this is local; null turns proximity off
+  places:
+    - {place: "Boston, MA", weight: 1.0}
+    - {place: "Denver, CO", weight: 0.7}
+    - {state: "CO", weight: 0.5}
+  relocation: "no"          # no | willing | preferred
+```
+
+A weight only raises a location's score — to rule somewhere out, don't name it. With
+`relocation: "no"`, anything beyond the radius is filtered rather than ranked low; a place the
+table can't resolve is never filtered, only discounted, so nothing disappears for a reason you
+can't see. No geocoding API is called: this works offline, and your home city never leaves the
+machine.
+
 **Review.** `resumaid serve`, or the CLI. Keyboard-driven: `j`/`k` move, `a` approves, `x`
 rejects with a reason, `s` snoozes, `p` pastes in a description the tool wasn't allowed to
 fetch, `o` opens the posting.

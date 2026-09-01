@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 
+from resumaid import geo
 from resumaid.match.gate import posting_seniority
 from resumaid.models import (
     DimensionScore,
@@ -169,24 +170,112 @@ def score_seniority(posting: RawPosting, profile: Profile, interests: Interests)
     )
 
 
-def score_location(posting: RawPosting, interests: Interests) -> DimensionScore:
+#: Score for a role in a place you named explicitly, before its weight is applied.
+NAMED_PLACE_SCORE = 100.0
+#: A state you named is a weaker signal than the city itself.
+NAMED_STATE_SCORE = 88.0
+#: A role at your doorstep, decaying to this at the edge of your radius.
+AT_HOME_SCORE = 100.0
+EDGE_OF_RADIUS_SCORE = 82.0
+#: Beyond the radius, how much a role is worth depends on whether you'd move for it.
+RELOCATION_CEILING = {"preferred": 75.0, "willing": 55.0, "no": 20.0}
+
+
+def home_location(profile: Profile, interests: Interests) -> str | None:
+    """Where the user is. Declared preference wins; otherwise the resume's own location."""
+    return interests.locations.home or (profile.locations[0] if profile.locations else None)
+
+
+def score_location(
+    posting: RawPosting, interests: Interests, profile: Profile | None = None
+) -> DimensionScore:
+    """How well a posting's location suits the user.
+
+    Three signals, best-of: a place you named explicitly, a state you named, and how far the
+    role is from home. Each carries the weight you gave it, so "Denver at 0.7" ranks below
+    "Boston at 1.0" without either being excluded.
+    """
     prefs = interests.locations
     if posting.remote and prefs.remote:
         return DimensionScore(name="location", score=100.0, weight=2.0, evidence="remote")
-    locs = ", ".join(posting.locations) or "unspecified"
-    for metro in prefs.metros:
-        m = metro.lower()
-        if any(m.split(",")[0].strip() in loc.lower() for loc in posting.locations):
-            return DimensionScore(name="location", score=100.0, weight=2.0,
-                                  evidence=f"in {metro}, a metro you named")
+
+    shown = ", ".join(posting.locations) or "unspecified"
+    best: tuple[float, str] | None = None
+
+    def consider(score: float, evidence: str) -> None:
+        nonlocal best
+        if best is None or score > best[0]:
+            best = (score, evidence)
+
+    posting_states = {geo.state_of(loc) for loc in posting.locations} - {None}
+
+    for pref in prefs.all_places():
+        if pref.place:
+            wanted = geo.resolve(pref.place)
+            for loc in posting.locations:
+                here = geo.resolve(loc)
+                pref_city = geo.parse_place(pref.place)[0]
+                loc_city = geo.parse_place(loc)[0]
+                same = (wanted is not None and wanted == here) or (
+                    pref_city is not None and pref_city == loc_city
+                )
+                if same:
+                    consider(
+                        NAMED_PLACE_SCORE * pref.weight,
+                        f"in {pref.place}, which you named"
+                        + ("" if pref.weight >= 1.0 else f" (weight {pref.weight:g})"),
+                    )
+        elif pref.state and pref.state.upper() in posting_states:
+            consider(
+                NAMED_STATE_SCORE * pref.weight,
+                f"in {pref.state.upper()}, a state you named"
+                + ("" if pref.weight >= 1.0 else f" (weight {pref.weight:g})"),
+            )
+
+    # Proximity to home, which is what makes "just over the state line" score like the
+    # short commute it is rather than like another state.
+    home = home_location(profile or Profile(), interests)
+    radius = prefs.max_distance_miles
+    if home and radius:
+        for loc in posting.locations:
+            miles = geo.distance_between(home, loc)
+            if miles is None:
+                continue
+            if miles <= radius:
+                fraction = miles / radius if radius else 0.0
+                consider(
+                    AT_HOME_SCORE - (AT_HOME_SCORE - EDGE_OF_RADIUS_SCORE) * fraction,
+                    f"{miles:.0f}mi from {home}, inside your {radius:.0f}mi radius",
+                )
+            else:
+                ceiling = RELOCATION_CEILING.get(prefs.relocation, 20.0)
+                # Decay from the edge of the radius toward the relocation ceiling, so 80 miles
+                # away still beats 800 when you would consider moving.
+                overshoot = min(1.0, (miles - radius) / (radius * 8))
+                consider(
+                    EDGE_OF_RADIUS_SCORE
+                    - (EDGE_OF_RADIUS_SCORE - ceiling) * (0.35 + 0.65 * overshoot),
+                    f"{miles:.0f}mi from {home}"
+                    + (
+                        f"; you'd {'prefer to ' if prefs.relocation == 'preferred' else ''}relocate"
+                        if prefs.will_relocate
+                        else "; outside your radius"
+                    ),
+                )
+
+    if best is not None:
+        return DimensionScore(name="location", score=min(100.0, best[0]), weight=2.0,
+                              evidence=best[1])
+
+    # Nothing resolved: fall back to willingness alone, and say so rather than implying more.
     if prefs.relocation == "preferred":
         return DimensionScore(name="location", score=75.0, weight=2.0,
-                              evidence=f"{locs}; you'd prefer to relocate")
+                              evidence=f"{shown}; you'd prefer to relocate")
     if prefs.relocation == "willing":
         return DimensionScore(name="location", score=55.0, weight=2.0,
-                              evidence=f"{locs}; you'd relocate for the right role")
+                              evidence=f"{shown}; you'd relocate for the right role")
     return DimensionScore(name="location", score=25.0, weight=2.0,
-                          evidence=f"{locs}, outside your declared locations")
+                          evidence=f"{shown}, outside your declared locations")
 
 
 def score_industry(posting: RawPosting, interests: Interests) -> DimensionScore:
@@ -215,7 +304,7 @@ def score(
         family_dim,
         score_skills(posting, profile),
         score_seniority(posting, profile, interests),
-        score_location(posting, interests),
+        score_location(posting, interests, profile),
         score_industry(posting, interests),
     ]
     matched = [d.evidence for d in dims if d.score >= 70]

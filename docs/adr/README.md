@@ -20,6 +20,7 @@ old file stays, marked superseded.
 | [0007](0007-source-set-and-self-feeding-board-registry.md) | Source set, and a self-feeding ATS board registry | accepted | 2026-08-31 |
 | [0008](0008-applications-log-and-oa-prediction.md) | Applications log as a durable table; OA predicted from runtime data | accepted | 2026-08-31 |
 | [0009](0009-link-only-entries-and-paste-to-upgrade.md) | Link-only entries, and paste-to-upgrade | accepted | 2026-08-31 |
+| [0010](0010-offline-place-resolution.md) | Offline place resolution, and weighted location preferences | accepted | 2026-09-01 |
 
 ## Format
 

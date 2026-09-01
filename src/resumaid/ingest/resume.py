@@ -196,6 +196,36 @@ def detect_seniority(text: str) -> str | None:
     return None
 
 
+#: "Boston, MA" or "Boston, Massachusetts" — the shape a contact block uses.
+_HOME_LOCATION = re.compile(
+    r"\b([A-Z][A-Za-z.\-' ]{2,28}?),\s*([A-Z]{2}\b|[A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\b"
+)
+
+
+def detect_home_location(text: str) -> str | None:
+    """The candidate's own location, read from the contact block.
+
+    Only the first few lines are considered: a "City, ST" further down is far more likely to
+    belong to an employer or a school than to the candidate. Returns None rather than guessing —
+    the user can always set `locations.home` in interests.yaml.
+    """
+    from resumaid.geo import normalize_state
+
+    for raw in (text or "").splitlines()[:8]:
+        # A contact line usually runs "Boston, MA | jane@example.com | 617-555-0134", so strip
+        # the email and phone rather than skipping the line they share with the city.
+        line = re.sub(r"\S+@\S+", " ", raw)
+        line = re.sub(r"[\d()+][\d\s().-]{6,}", " ", line).strip()
+        if not line:
+            continue
+        for match in _HOME_LOCATION.finditer(line):
+            city, state_token = match.group(1).strip(), match.group(2).strip()
+            state = normalize_state(state_token)
+            if state and len(city.split()) <= 4:
+                return f"{city}, {state}"
+    return None
+
+
 def parse_profile(texts: dict[str, str]) -> Profile:
     """Build a structured profile from one or more resume texts.
 
@@ -228,6 +258,11 @@ def parse_profile(texts: dict[str, str]) -> Profile:
     joined = "\n".join(texts.values())
     profile.highest_degree_level = detect_degree_level(joined)
     profile.seniority = detect_seniority(joined)
+    for text in texts.values():
+        home = detect_home_location(text)
+        if home:
+            profile.locations = [home]
+            break
     return profile
 
 

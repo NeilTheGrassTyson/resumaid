@@ -31,9 +31,22 @@ role_families: []
 
 industries: []
 
+# Where you'll work.
+#   home       — your base. Defaults to the location parsed from your resume; set it to override.
+#   places     — cities and states you want, each weighted like a role family. A weight only
+#                raises a location's score; to rule somewhere out, leave it unnamed (with
+#                relocation "no") rather than giving it a low weight.
+#   max_distance_miles — anything closer to home than this counts as local, whichever state
+#                it's in. With relocation "no", anything further is filtered out rather than
+#                ranked low. Set to null to switch proximity off.
 locations:
   remote: true
-  metros: []
+  home:
+  max_distance_miles: 50
+  places: []
+#   - {place: "Boston, MA", weight: 1.0}
+#   - {place: "Denver, CO", weight: 0.7}
+#   - {state: "CO", weight: 0.5}
   relocation: "no"      # no | willing | preferred
 
 hard_filters:
