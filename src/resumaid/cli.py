@@ -34,7 +34,7 @@ from resumaid.ingest.interests import (
 from resumaid.ingest.resume import add_resume, list_resumes, parse_profile, resume_texts
 from resumaid.models import Interests, Outcome, Profile, QueueState, RejectionReason, Source
 from resumaid.queue import store as queue_store
-from resumaid.sources.registry import board_from_url, list_boards, register
+from resumaid.sources.registry import board_from_url, disable, list_boards, register
 from resumaid.util import jload
 
 app = typer.Typer(help="Personal job-search copilot. Finds and prepares; you approve and submit.",
@@ -43,10 +43,14 @@ resume_app = typer.Typer(help="Manage the resumes you maintain.", no_args_is_hel
 queue_app = typer.Typer(help="Review the queue.", no_args_is_help=True)
 board_app = typer.Typer(help="ATS boards to poll.", no_args_is_help=True)
 app_log = typer.Typer(help="Your application history.", no_args_is_help=True)
+interests_app = typer.Typer(help="What you're looking for.", no_args_is_help=True)
+profile_app = typer.Typer(help="Your parsed profile.", no_args_is_help=True)
 app.add_typer(resume_app, name="resume")
 app.add_typer(queue_app, name="queue")
 app.add_typer(board_app, name="board")
 app.add_typer(app_log, name="app")
+app.add_typer(interests_app, name="interests")
+app.add_typer(profile_app, name="profile")
 
 console = Console()
 
@@ -130,6 +134,30 @@ def resume_add(
                   "not an authority.[/dim]")
 
 
+@resume_app.command("remove")
+def resume_remove(resume_id: int) -> None:
+    """Forget a resume. Your file stays where it is; this only drops the record."""
+    conn = _db()
+    row = conn.execute("SELECT filename FROM resumes WHERE id = ?", (resume_id,)).fetchone()
+    if row is None:
+        console.print(f"[red]No resume {resume_id}[/red]")
+        raise typer.Exit(1)
+    conn.execute("DELETE FROM resumes WHERE id = ?", (resume_id,))
+    console.print(f"Removed {row['filename']} [dim](the file itself is untouched)[/dim]")
+
+
+@resume_app.command("master")
+def resume_master(resume_id: int) -> None:
+    """Mark which document is your full master resume. Only one can be."""
+    conn = _db()
+    row = conn.execute("SELECT filename FROM resumes WHERE id = ?", (resume_id,)).fetchone()
+    if row is None:
+        console.print(f"[red]No resume {resume_id}[/red]")
+        raise typer.Exit(1)
+    conn.execute("UPDATE resumes SET is_master = (id = ?)", (resume_id,))
+    console.print(f"{row['filename']} is now your master resume")
+
+
 @resume_app.command("list")
 def resume_list() -> None:
     """Show the resumes the tool will select among."""
@@ -142,6 +170,96 @@ def resume_list() -> None:
         table.add_row(str(doc.id), doc.filename, "yes" if doc.is_master else "",
                       ", ".join(doc.emphasis_terms[:6]))
     console.print(table)
+
+
+# --- interests and profile ------------------------------------------------------------
+
+
+def _open_in_editor(path: Path) -> None:
+    """Open a YAML file in $EDITOR. Both of these files are meant to be hand-edited."""
+    import os
+    import shutil
+    import subprocess
+
+    editor = os.environ.get("EDITOR") or os.environ.get("VISUAL")
+    if not editor:
+        editor = "notepad" if os.name == "nt" else (shutil.which("nano") or shutil.which("vi"))
+    if not editor:
+        console.print(f"[yellow]No $EDITOR set. Edit it yourself:[/yellow] {path}")
+        return
+    subprocess.run([editor, str(path)], check=False)
+
+
+@interests_app.command("edit")
+def interests_edit() -> None:
+    """Open interests.yaml in your editor, then check it parses."""
+    path = paths().ensure().interests
+    if not path.exists():
+        write_interests_template()
+    _open_in_editor(path)
+    try:
+        loaded = load_interests(path)
+    except Exception as exc:  # noqa: BLE001 - surface any validation failure verbatim
+        console.print(f"[red]interests.yaml does not parse:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    console.print(
+        f"[green]Saved.[/green] {len(loaded.role_families)} role families, "
+        f"{len(loaded.locations.all_places())} places, "
+        f"{loaded.throughput.submissions_per_day}/day target"
+    )
+
+
+@interests_app.command("show")
+def interests_show() -> None:
+    """Print what you've declared."""
+    try:
+        loaded = load_interests()
+    except FileNotFoundError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    table = Table("family", "weight", "min fit", "keywords")
+    for fam in loaded.role_families:
+        table.add_row(fam.name, f"{fam.weight:g}",
+                      f"{fam.min_fit:g}" if fam.min_fit else "",
+                      ", ".join(fam.keywords[:5]))
+    console.print(table)
+    prefs = loaded.locations
+    console.print(f"Home: {prefs.home or '(from resume)'}  "
+                  f"Radius: {prefs.max_distance_miles or 'off'}mi  "
+                  f"Remote: {'yes' if prefs.remote else 'no'}  "
+                  f"Relocation: {prefs.relocation}")
+    for place in prefs.all_places():
+        console.print(f"  {place.label} (weight {place.weight:g})")
+
+
+@profile_app.command("edit")
+def profile_edit() -> None:
+    """Open profile.yaml in your editor. It is yours to correct after the first parse."""
+    path = paths().ensure().profile
+    if not path.exists():
+        console.print("[red]No profile yet. Run `resumaid resume add <file>` first.[/red]")
+        raise typer.Exit(1)
+    _open_in_editor(path)
+    try:
+        loaded = load_profile(path)
+    except Exception as exc:  # noqa: BLE001
+        console.print(f"[red]profile.yaml does not parse:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    console.print(f"[green]Saved.[/green] {len(loaded.skills)} skills, "
+                  f"degree: {loaded.highest_degree_level or 'unspecified'}")
+
+
+@profile_app.command("reparse")
+def profile_reparse() -> None:
+    """Re-derive the profile from your resumes, discarding hand edits."""
+    conn = _db()
+    if not list_resumes(conn):
+        console.print("[red]No resumes uploaded yet.[/red]")
+        raise typer.Exit(1)
+    profile = parse_profile(resume_texts(conn))
+    save_profile(profile)
+    console.print(f"[green]Re-parsed.[/green] {len(profile.skills)} skills, "
+                  f"home: {profile.locations[0] if profile.locations else 'unknown'}")
 
 
 # --- boards --------------------------------------------------------------------------
@@ -167,6 +285,30 @@ def board_add(
     added = register(conn, ref.source, ref.token, company=company, via="manual")
     console.print(("[green]Added[/green] " if added else "Already registered: ")
                   + f"{ref.source.value}/{ref.token}")
+
+
+@board_app.command("remove")
+def board_remove(board_id: int) -> None:
+    """Stop polling a board. Disabled rather than deleted, so it cannot self-re-register."""
+    conn = _db()
+    row = conn.execute("SELECT source, token FROM boards WHERE id = ?", (board_id,)).fetchone()
+    if row is None:
+        console.print(f"[red]No board {board_id}[/red]")
+        raise typer.Exit(1)
+    disable(conn, board_id)
+    console.print(f"Disabled {row['source']}/{row['token']}")
+
+
+@board_app.command("enable")
+def board_enable(board_id: int) -> None:
+    """Start polling a previously disabled board again."""
+    conn = _db()
+    row = conn.execute("SELECT source, token FROM boards WHERE id = ?", (board_id,)).fetchone()
+    if row is None:
+        console.print(f"[red]No board {board_id}[/red]")
+        raise typer.Exit(1)
+    conn.execute("UPDATE boards SET enabled = 1 WHERE id = ?", (board_id,))
+    console.print(f"Enabled {row['source']}/{row['token']}")
 
 
 @board_app.command("list")
@@ -532,15 +674,53 @@ def status() -> None:
     console.print(f"Resumes: {len(list_resumes(conn))}  Boards: {len(list_boards(conn))}")
 
 
+def _build_ui() -> bool:
+    """Run the SPA build. Returns whether it succeeded."""
+    import shutil
+    import subprocess
+
+    ui_dir = Path(__file__).resolve().parents[2] / "ui"
+    npm = shutil.which("npm") or shutil.which("npm.cmd")
+    if npm is None:
+        console.print("[red]npm not found on PATH — install Node, then build the UI.[/red]")
+        return False
+    if not (ui_dir / "node_modules").exists():
+        console.print("Installing UI dependencies…")
+        if subprocess.run([npm, "ci"], cwd=ui_dir, check=False).returncode != 0:
+            return False
+    console.print("Building the review UI…")
+    return subprocess.run([npm, "run", "build"], cwd=ui_dir, check=False).returncode == 0
+
+
 @app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", help="Localhost only. This is a single-user tool."),
     port: int = typer.Option(8765),
+    build: bool = typer.Option(False, "--build", help="Build the UI first (needs npm)."),
+    api_only: bool = typer.Option(False, "--api-only", help="Serve the API with no UI."),
 ) -> None:
-    """Open the review UI."""
+    """Open the review UI.
+
+    Refuses to start without a built UI rather than serving a 404 at the root: `ui/dist` is a
+    build artifact and is not committed, so a fresh clone has none.
+    """
     import uvicorn
 
-    console.print(f"Review queue: [bold]http://{host}:{port}[/bold]")
+    from resumaid.api.app import BUILD_HINT, ui_is_built
+
+    if not api_only and not ui_is_built():
+        if build and _build_ui():
+            pass
+        else:
+            console.print(f"[yellow]{BUILD_HINT}[/yellow]")
+            if not build:
+                console.print("\nOr let me do it: [bold]resumaid serve --build[/bold]")
+            raise typer.Exit(1)
+
+    if api_only:
+        console.print(f"API only: [bold]http://{host}:{port}/docs[/bold]")
+    else:
+        console.print(f"Review queue: [bold]http://{host}:{port}[/bold]")
     uvicorn.run("resumaid.api.app:app", host=host, port=port, log_level="warning")
 
 

@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
-from resumaid.api import routes_applications, routes_meta, routes_queue
+from resumaid.api import routes_applications, routes_meta, routes_queue, routes_setup
 
 UI_DIST = Path(__file__).resolve().parents[3] / "ui" / "dist"
 
@@ -28,6 +28,7 @@ app = FastAPI(
 app.include_router(routes_queue.router)
 app.include_router(routes_applications.router)
 app.include_router(routes_meta.router)
+app.include_router(routes_setup.router)
 
 
 @app.get("/api/health")
@@ -35,9 +36,23 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def ui_is_built() -> bool:
+    """Whether there is a built SPA to serve. `ui/dist` is a build artifact, not committed."""
+    return (UI_DIST / "index.html").is_file()
+
+
+BUILD_HINT = (
+    "The review UI has not been built yet.\n\n"
+    "  cd ui\n"
+    "  npm install\n"
+    "  npm run build\n\n"
+    "Then run `resumaid serve` again. To skip the UI entirely, use `resumaid serve --api-only`."
+)
+
+
 def mount_ui() -> None:
     """Serve the built SPA, so `resumaid serve` is one process and one URL."""
-    if not UI_DIST.exists():
+    if not ui_is_built():
         return
     assets = UI_DIST / "assets"
     if assets.exists():

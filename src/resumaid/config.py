@@ -12,6 +12,9 @@ from pathlib import Path
 
 APP_DIR_ENV = "RESUMAID_HOME"
 
+#: Several protections here are POSIX-only. Named once so the reason travels with the check.
+IS_WINDOWS = os.name == "nt"
+
 
 def app_dir() -> Path:
     """The user's data directory. Overridable for tests via ``RESUMAID_HOME``."""
@@ -60,8 +63,12 @@ class Paths:
         self.root.mkdir(parents=True, exist_ok=True)
         for d in (self.resumes, self.writing_samples, self.cache):
             d.mkdir(parents=True, exist_ok=True)
-        # The data dir holds resumes and PII. Keep it to the owner.
-        os.chmod(self.root, 0o700)
+        # The data dir holds resumes and PII, so keep it to the owner. POSIX only: on Windows
+        # chmod moves the read-only flag and nothing else, so it would imply a protection it
+        # does not provide. There, the directory inherits the user profile's ACL, which already
+        # restricts it to this account.
+        if not IS_WINDOWS:
+            os.chmod(self.root, 0o700)
         return self
 
 
@@ -77,7 +84,10 @@ def load_secrets(path: Path | None = None) -> dict[str, str]:
     p = path or paths().secrets
     values: dict[str, str] = {}
     if p.exists():
-        if p.stat().st_mode & 0o077:
+        # st_mode carries no useful permission bits on Windows — it reports 0o666 for almost
+        # every file — so this check would fire on every run with advice (`chmod`) that does
+        # not apply there.
+        if not IS_WINDOWS and p.stat().st_mode & 0o077:
             # Not fatal — warn loudly rather than block the user's own machine.
             print(f"warning: {p} is readable by others; run  chmod 600 {p}")
         for raw in p.read_text(encoding="utf-8").splitlines():

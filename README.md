@@ -17,15 +17,38 @@ Local-first and single-user. Your resumes and application history stay on your m
 
 ```bash
 uv venv && uv pip install -e '.[dev]'
+cd ui && npm install && npm run build && cd ..   # builds the review UI, once
 
-resumaid init                          # creates ~/.resumaid and an interests.yaml to fill in
-$EDITOR ~/.resumaid/interests.yaml     # declare role families, locations, filters
+resumaid init        # creates ~/.resumaid
+resumaid serve       # http://127.0.0.1:8765 — go to the Setup tab
+```
+
+Everything after installing is doable in the browser: drop in your resumes, say what you're
+looking for, add job boards, run discovery, triage the queue, and record what you submit. The
+CLI does all of the same things if you prefer it — every browser action has a command, and both
+write the same files.
+
+<details>
+<summary>Or set it up entirely from the command line</summary>
+
+```bash
 resumaid resume add ~/resumes/master.pdf --master
 resumaid resume add ~/resumes/defense.pdf
-$EDITOR ~/.resumaid/profile.yaml       # check what the parser got; correct it
+resumaid interests edit                # opens ~/.resumaid/interests.yaml
+resumaid profile edit                  # check what the parser read from your resumes
 resumaid board add https://boards.greenhouse.io/somecompany
 resumaid run
-resumaid serve                         # review queue at http://127.0.0.1:8765
+```
+</details>
+
+`resumaid serve` refuses to start without a built UI rather than serving a blank page — pass
+`--build` to build it for you, or `--api-only` to skip it. On Windows, if VS Code auto-activates
+a different project's virtualenv in every terminal, name the interpreter explicitly so the
+install cannot land in the wrong project:
+
+```powershell
+uv venv
+uv pip install --python .\.venv\Scripts\python.exe -e ".[dev]"
 ```
 
 Nothing is assumed about what you're looking for. There is no built-in idea of which roles are
@@ -104,7 +127,11 @@ anywhere; if the tool doesn't know, it says `unknown`.
 |---|---|
 | `resumaid init` | Create the data directory and interests template |
 | `resumaid resume add <file> [--master]` | Register a resume; re-parses your profile |
+| `resumaid resume list \| remove \| master <id>` | Manage your resumes |
+| `resumaid interests edit \| show` | What you're looking for |
+| `resumaid profile edit \| reparse` | The profile parsed from your resumes |
 | `resumaid board add <url\|token>` | Register an ATS board to poll |
+| `resumaid board list \| remove \| enable <id>` | Manage boards |
 | `resumaid run [--llm] [--research-oa]` | Discover, score, queue |
 | `resumaid queue list \| show <id> \| filtered` | Read the queue |
 | `resumaid queue approve \| reject \| snooze \| paste <id>` | Triage |
@@ -113,7 +140,7 @@ anywhere; if the tool doesn't know, it says `unknown`.
 | `resumaid app log \| update <id>` | The application history |
 | `resumaid export [--format csv\|xlsx]` | Export the history |
 | `resumaid status` | Where everything stands |
-| `resumaid serve` | The review UI on localhost |
+| `resumaid serve [--build] [--api-only]` | The review UI on localhost |
 
 ## Your data
 

@@ -132,6 +132,16 @@ API_TO_CLI = {
     "/api/queue/{entry_id}/paste": "queue paste",
     "/api/queue/{entry_id}/unapprove": "queue unapprove",
     "/api/queue/{entry_id}/submitted": "submitted",
+    # Setup, reachable from the browser and from here.
+    "/api/resumes": "resume add",
+    "/api/resumes/{resume_id}": "resume remove",
+    "/api/resumes/{resume_id}/master": "resume master",
+    "/api/profile": "profile edit",
+    "/api/profile/reparse": "profile reparse",
+    "/api/interests": "interests edit",
+    "/api/boards": "board add",
+    "/api/boards/{board_id}": "board remove",
+    "/api/boards/{board_id}/enable": "board enable",
 }
 
 MUTATING_VERBS = {"post", "patch", "put", "delete"}

@@ -19,8 +19,9 @@ import FilteredTable from "./components/FilteredTable";
 import LogTable from "./components/LogTable";
 import MaterialsRail from "./components/MaterialsRail";
 import QueueList from "./components/QueueList";
+import SetupTab from "./components/SetupTab";
 
-type Tab = "queue" | "ready" | "log" | "filtered";
+type Tab = "queue" | "ready" | "log" | "filtered" | "setup";
 
 const KEYS: Record<Tab, [string, string][]> = {
   queue: [
@@ -29,7 +30,8 @@ const KEYS: Record<Tab, [string, string][]> = {
   ],
   ready: [["j / k", "move"], ["o", "open posting"], ["enter", "I submitted this"], ["u", "back to queue"]],
   log: [["click a cell", "record an outcome"], ["e", "export CSV"]],
-  filtered: [["1-4", "switch tab"]],
+  filtered: [["1-5", "switch tab"]],
+  setup: [["1-5", "switch tab"]],
 };
 
 export default function App() {
@@ -45,6 +47,7 @@ export default function App() {
   const [channel, setChannel] = useState("");
   const [running, setRunning] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [setupIncomplete, setSetupIncomplete] = useState(false);
 
   const say = useCallback((message: string) => {
     setToast(message);
@@ -60,6 +63,10 @@ export default function App() {
       setReady(nextReady);
       setApplications(nextApps);
       setFiltered(nextFiltered);
+      // A prompt on the Setup tab beats an empty queue with no explanation.
+      await api.setupStatus()
+        .then((status) => setSetupIncomplete(!status.ready))
+        .catch(() => setSetupIncomplete(true));
     } catch (error) {
       say(error instanceof ApiError ? error.message : "Could not reach the local API.");
     } finally {
@@ -158,9 +165,9 @@ export default function App() {
       if (modal) return;
 
       const key = event.key.toLowerCase();
-      const tabs: Tab[] = ["queue", "ready", "log", "filtered"];
-      if (["1", "2", "3", "4"].includes(key)) { setTab(tabs[Number(key) - 1]); return; }
-      if (tab === "log" || tab === "filtered") {
+      const tabs: Tab[] = ["queue", "ready", "log", "filtered", "setup"];
+      if (["1", "2", "3", "4", "5"].includes(key)) { setTab(tabs[Number(key) - 1]); return; }
+      if (tab === "log" || tab === "filtered" || tab === "setup") {
         if (key === "e" && tab === "log") window.location.href = "/api/applications/export";
         return;
       }
@@ -197,10 +204,15 @@ export default function App() {
             ["ready", "Ready to submit", ready.length],
             ["log", "Applications", applications.length],
             ["filtered", "Filtered", counts.filtered ?? 0],
+            ["setup", "Setup", setupIncomplete ? -2 : -1],
           ] as [Tab, string, number][]).map(([id, label, count]) => (
             <button key={id} className="tab" role="tab" aria-selected={tab === id}
                     onClick={() => setTab(id)}>
-              {label}<span className="count">{count}</span>
+              {label}
+              {count >= 0 && <span className="count">{count}</span>}
+              {count === -2 && (
+                <span className="count needs" title="Add a resume and say what you're looking for">!</span>
+              )}
             </button>
           ))}
         </nav>
@@ -214,7 +226,9 @@ export default function App() {
         </button>
       </header>
 
-      {tab === "log" ? (
+      {tab === "setup" ? (
+        <div className="pane"><SetupTab onChanged={() => void refresh()} /></div>
+      ) : tab === "log" ? (
         <div className="pane"><LogTable applications={applications} onPatch={patchApplication} /></div>
       ) : tab === "filtered" ? (
         <div className="pane"><FilteredTable entries={filtered} /></div>

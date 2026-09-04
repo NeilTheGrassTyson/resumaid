@@ -282,7 +282,14 @@ export interface paths {
         /** Resumes */
         get: operations["resumes_api_resumes_get"];
         put?: never;
-        post?: never;
+        /**
+         * Upload Resume
+         * @description Accept a resume from the browser and register it.
+         *
+         *     The file is validated and written to a temporary location first, so a rejected upload never
+         *     leaves anything behind in the user's resumes directory.
+         */
+        post: operations["upload_resume_api_resumes_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -298,7 +305,14 @@ export interface paths {
         };
         /** Profile */
         get: operations["profile_api_profile_get"];
-        put?: never;
+        /**
+         * Put Profile
+         * @description Save a corrected profile.
+         *
+         *     The parse is a starting point, not an authority — after the first run this file is the
+         *     user's, and the matcher scores against whatever it says.
+         */
+        put: operations["put_profile_api_profile_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -315,7 +329,14 @@ export interface paths {
         };
         /** Interests */
         get: operations["interests_api_interests_get"];
-        put?: never;
+        /**
+         * Put Interests
+         * @description Save declared targeting.
+         *
+         *     FastAPI validates the body against the model before this runs, so a malformed payload is
+         *     rejected with field errors and interests.yaml is never left in a broken state.
+         */
+        put: operations["put_interests_api_interests_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -333,7 +354,11 @@ export interface paths {
         /** Boards */
         get: operations["boards_api_boards_get"];
         put?: never;
-        post?: never;
+        /**
+         * Add Board
+         * @description Register an ATS board by URL, or by source and token.
+         */
+        post: operations["add_board_api_boards_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -354,6 +379,126 @@ export interface paths {
          * @description Discover, score, and queue. Submits nothing — see CLAUDE.md constraint 1.
          */
         post: operations["trigger_run_api_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resumes/{resume_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Resume
+         * @description Forget a resume. The user's file is left where it is — this tool does not delete it.
+         */
+        delete: operations["delete_resume_api_resumes__resume_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resumes/{resume_id}/master": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Master
+         * @description Mark which document is the full master. Only one can be.
+         */
+        post: operations["set_master_api_resumes__resume_id__master_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile/reparse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reparse Profile
+         * @description Re-derive the profile from the uploaded resumes, discarding hand edits.
+         */
+        post: operations["reparse_profile_api_profile_reparse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/boards/{board_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Board
+         * @description Stop polling a board.
+         *
+         *     Disables rather than deletes, so how it was discovered stays on the record and a
+         *     self-registering board does not silently come back on the next run.
+         */
+        delete: operations["remove_board_api_boards__board_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/boards/{board_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable Board */
+        post: operations["enable_board_api_boards__board_id__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/setup/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Setup Status
+         * @description What still needs doing before a run will find anything useful.
+         */
+        get: operations["setup_status_api_setup_status_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -438,6 +583,11 @@ export interface components {
         ApproveIn: {
             /** Note */
             note?: string | null;
+        };
+        /** Body_upload_resume_api_resumes_post */
+        Body_upload_resume_api_resumes_post: {
+            /** File */
+            file: string;
         };
         /**
          * DimensionScore
@@ -1280,6 +1430,41 @@ export interface operations {
             };
         };
     };
+    upload_resume_api_resumes_post: {
+        parameters: {
+            query?: {
+                is_master?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_resume_api_resumes_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     profile_api_profile_get: {
         parameters: {
             query?: never;
@@ -1296,6 +1481,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Profile"];
+                };
+            };
+        };
+    };
+    put_profile_api_profile_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Profile"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1320,6 +1538,39 @@ export interface operations {
             };
         };
     };
+    put_interests_api_interests_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Interests"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Interests"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     boards_api_boards_get: {
         parameters: {
             query?: never;
@@ -1338,6 +1589,43 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+        };
+    };
+    add_board_api_boards_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1371,6 +1659,166 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_resume_api_resumes__resume_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_master_api_resumes__resume_id__master_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reparse_profile_api_profile_reparse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Profile"];
+                };
+            };
+        };
+    };
+    remove_board_api_boards__board_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_board_api_boards__board_id__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_status_api_setup_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

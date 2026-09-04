@@ -13,6 +13,7 @@ dependencies = [
     "pypdf>=4.2",
     "python-docx>=1.1",
     "rich>=13.7",
+    "python-multipart>=0.0.9",   # resume uploads from the review UI
 ]
 
 [project.optional-dependencies]

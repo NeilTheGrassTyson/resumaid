@@ -318,6 +318,10 @@ def extract_emphasis(
     ``exclude`` drops terms that carry no signal for *this* document — the candidate's own name
     appears in all of their resumes, so it cannot distinguish between them.
     """
+    # Strip the contact block's email and URLs first: an address domain is not something the
+    # document emphasizes, and "example.com" showing up as a top term is just noise.
+    text = re.sub(r"\S+@\S+", " ", text or "")
+    text = re.sub(r"https?://\S+|\bwww\.\S+", " ", text)
     words = re.findall(r"[A-Za-z][A-Za-z+#./-]{2,}", text)
     if not words:
         return [], ""
