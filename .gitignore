@@ -21,5 +21,11 @@ resumes/
 secrets.env
 .env
 
+# One deliberate exception: the PDF-extraction tests need a real PDF to read, and this one is
+# synthetic (Jane Q Public, example.com, a 555 number). Without it *.pdf above silently keeps
+# the fixture out of the repo and three tests fail on any fresh clone — which is exactly what
+# happened. Constraint 4 is about real resumes, not this.
+!tests/fixtures/*.pdf
+
 # Generated from the FastAPI app at build time; ui/src/api/types.ts is committed, this is not.
 openapi.json
