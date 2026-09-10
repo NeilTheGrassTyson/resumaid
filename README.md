@@ -70,10 +70,13 @@ like *"not recognized"* or *"command not found"*, jump to
 
 ## Step 4 — Download resumaid
 
-On this page, click the green **`< > Code`** button near the top, then **Download ZIP**.
+**[⬇️ Click here to download resumaid](https://github.com/NeilTheGrassTyson/resumaid/archive/refs/heads/claude/job-search-copilot-bootstrap-cprd3r.zip)**
 
-Unzip it somewhere you'll remember — your Desktop or Documents folder is fine. You'll get a
-folder called `resumaid-main` or similar.
+Unzip it somewhere you'll remember — your Desktop or Documents folder is fine.
+
+> **Use the link above, not the green "Code" button.** The code currently lives on a branch
+> rather than the main one, so the Code button's "Download ZIP" would give you an almost empty
+> folder. The link above gets the right thing.
 
 ## Step 5 — Open a terminal in that folder
 
