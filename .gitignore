@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+
+node_modules/
+ui/dist/
+
+# Never commit user data. The real store lives at ~/.resumaid, outside the repo;
+# these guard against an accidental local copy. Constraint 4.
+.resumaid/
+*.db
+resumes/
+*.pdf
+*.docx
+secrets.env
+.env
+
+# One deliberate exception: the PDF-extraction tests need a real PDF to read, and this one is
+# synthetic (Jane Q Public, example.com, a 555 number). Without it *.pdf above silently keeps
+# the fixture out of the repo and three tests fail on any fresh clone — which is exactly what
+# happened. Constraint 4 is about real resumes, not this.
+!tests/fixtures/*.pdf
+
+# Generated from the FastAPI app at build time; ui/src/api/types.ts is committed, this is not.
+openapi.json

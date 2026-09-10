@@ -1,0 +1,31 @@
+{
+  "name": "Vector Labs",
+  "jobs": [
+    {
+      "id": "aa11bb22-cc33-dd44-ee55-ff6677889900",
+      "title": "Infrastructure Engineer",
+      "location": "San Francisco, CA",
+      "secondaryLocations": [{"location": "Remote - US"}],
+      "department": "Infrastructure",
+      "team": "Core",
+      "employmentType": "FullTime",
+      "isRemote": false,
+      "publishedAt": "2026-08-25T17:30:00.000Z",
+      "jobUrl": "https://jobs.ashbyhq.com/vectorlabs/aa11bb22-cc33-dd44-ee55-ff6677889900",
+      "descriptionPlain": "Run our compute fleet. Terraform, Kubernetes, Go.",
+      "compensation": {"compensationTierSummary": "$180K – $220K"}
+    },
+    {
+      "id": "bb22cc33-dd44-ee55-ff66-778899001122",
+      "title": "Technical Writer",
+      "location": "Remote",
+      "secondaryLocations": [],
+      "department": "Product",
+      "employmentType": "Contract",
+      "isRemote": true,
+      "updatedAt": "2026-06-15T12:00:00.000Z",
+      "jobUrl": "https://jobs.ashbyhq.com/vectorlabs/bb22cc33-dd44-ee55-ff66-778899001122",
+      "descriptionHtml": "&lt;p&gt;Write docs. &lt;b&gt;Markdown&lt;/b&gt; fluency required.&lt;/p&gt;"
+    }
+  ]
+}

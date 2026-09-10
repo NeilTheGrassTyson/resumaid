@@ -1,0 +1,26 @@
+{
+  "count": 2,
+  "results": [
+    {
+      "id": "4998887766",
+      "title": "Embedded Software Engineer",
+      "company": {"display_name": "Northwind Defense"},
+      "location": {"display_name": "Denver, CO"},
+      "created": "2026-08-28T08:15:00Z",
+      "description": "Embedded C++ for guidance systems. Clearance eligibility preferred…",
+      "redirect_url": "https://www.adzuna.com/land/ad/4998887766?v=ABC",
+      "contract_time": "full_time",
+      "salary_min": 120000,
+      "salary_max": 165000
+    },
+    {
+      "id": "4998887767",
+      "title": "Platform Engineer",
+      "company": {"display_name": "Helio Systems"},
+      "location": {"display_name": "Remote"},
+      "created": "2026-08-15T11:00:00Z",
+      "description": "Kubernetes and Go at scale…",
+      "redirect_url": "https://boards.greenhouse.io/heliosystems/jobs/778899"
+    }
+  ]
+}

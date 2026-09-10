@@ -1,0 +1,23 @@
+[
+  {
+    "id": "8f2b1c4e-1111-2222-3333-444455556666",
+    "text": "Senior Backend Engineer",
+    "categories": {"team": "Platform", "location": "New York, NY", "commitment": "Full-time"},
+    "createdAt": 1755648000000,
+    "descriptionPlain": "Own our ingestion pipeline. Go, Postgres, Kubernetes.",
+    "lists": [{"text": "Requirements", "content": "&lt;li&gt;5+ years&lt;/li&gt;"}],
+    "hostedUrl": "https://jobs.lever.co/scaleco/8f2b1c4e-1111-2222-3333-444455556666",
+    "applyUrl": "https://jobs.lever.co/scaleco/8f2b1c4e-1111-2222-3333-444455556666/apply",
+    "workplaceType": "onsite"
+  },
+  {
+    "id": "9a3c2d5f-7777-8888-9999-000011112222",
+    "text": "Machine Learning Engineer",
+    "categories": {"team": "Research", "location": "Remote", "commitment": "Full-time"},
+    "createdAt": 1756252800000,
+    "descriptionPlain": "Train and evaluate models. Python, PyTorch.",
+    "lists": [],
+    "hostedUrl": "https://jobs.lever.co/scaleco/9a3c2d5f-7777-8888-9999-000011112222",
+    "workplaceType": "remote"
+  }
+]
