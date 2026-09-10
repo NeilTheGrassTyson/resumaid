@@ -234,7 +234,8 @@ export default function App() {
         <div className="pane"><FilteredTable entries={filtered} /></div>
       ) : list.length === 0 ? (
         <div className="pane">
-          <EmptyState tab={tab} loaded={loaded} queued={slate?.total_queued ?? 0} />
+          <EmptyState tab={tab} loaded={loaded} queued={slate?.total_queued ?? 0}
+                      setupIncomplete={setupIncomplete} onSetup={() => setTab("setup")} />
         </div>
       ) : (
         <div className="triage" role="listbox" aria-label="Review queue">
@@ -329,7 +330,10 @@ export default function App() {
   );
 }
 
-function EmptyState({ tab, loaded, queued }: { tab: Tab; loaded: boolean; queued: number }) {
+function EmptyState(
+  { tab, loaded, queued, setupIncomplete, onSetup }:
+  { tab: Tab; loaded: boolean; queued: number; setupIncomplete: boolean; onSetup: () => void },
+) {
   if (!loaded) return <div className="empty">Loading…</div>;
   if (tab === "ready") {
     return (
@@ -340,27 +344,44 @@ function EmptyState({ tab, loaded, queued }: { tab: Tab; loaded: boolean; queued
       </div>
     );
   }
+  if (queued > 0) {
+    return (
+      <div className="empty">
+        <h2>Nothing left for today</h2>
+        <p>You've worked through today's slate. Press <kbd>r</kbd> to look for more.</p>
+      </div>
+    );
+  }
+  // Two different empty queues wearing the same face: one needs setup, the other is a
+  // genuinely thin day. Telling them apart is the difference between a fixable state and
+  // an alarming one.
+  if (setupIncomplete) {
+    return (
+      <div className="empty">
+        <h2>Set up first</h2>
+        <p>
+          resumaid needs your resume and a sense of what you're looking for before it can
+          find anything. Both take a couple of minutes on the Setup tab.
+        </p>
+        <button className="act confirm" style={{ width: "auto" }} onClick={onSetup}>
+          Open Setup
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="empty">
-      <h2>{queued > 0 ? "Nothing left for today" : "Queue is empty"}</h2>
-      {queued > 0 ? (
-        <p>You've worked through today's slate. Press <kbd>r</kbd> to look for more.</p>
-      ) : (
-        <>
-          <p>
-            Press <kbd>r</kbd> to run discovery, or from a terminal: <code>resumaid run</code>.
-          </p>
-          <p>
-            If nothing turns up, check that you've added a resume
-            (<code>resumaid resume add</code>) and declared what you're looking for in
-            <code>interests.yaml</code>.
-          </p>
-          <p className="constraint">
-            A thin day is a real answer: if only three roles clear the bar, only three are
-            queued. The bar doesn't move to fill a quota.
-          </p>
-        </>
-      )}
+      <h2>Queue is empty</h2>
+      <p>Press <kbd>r</kbd> to run discovery.</p>
+      <p>
+        If nothing turns up, you may not have many job boards yet — add a few companies you'd
+        like to work at on the{" "}
+        <button className="linkish" onClick={onSetup}>Setup tab</button>.
+      </p>
+      <p className="constraint">
+        A thin day is a real answer: if only three roles clear the bar, only three are
+        queued. The bar doesn't move to fill a quota.
+      </p>
     </div>
   );
 }
