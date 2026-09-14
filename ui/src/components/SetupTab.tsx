@@ -13,6 +13,7 @@ import {
   api, ApiError,
   type Board, type Interests, type PlacePref, type Profile, type Resume, type RoleFamily,
 } from "../api/client";
+import { CommaListInput } from "./Bits";
 
 type Loaded = {
   resumes: Resume[];
@@ -191,6 +192,12 @@ function ResumeSection({
         Upload the resumes you already maintain. The tool picks the best-fitting one for each
         role — it never rewrites them.
       </p>
+      <p className="note">
+        Worth having one comprehensive master resume — everything you've done, not trimmed down
+        for any one role. Per-role tailoring will eventually cut a master down to a one-pager for
+        a specific posting, and it can only work with what's on the page: more on the master now
+        means better-tailored variants later. Mark your fullest resume as master below.
+      </p>
 
       <div
         className={`dropzone${dragging ? " over" : ""}`}
@@ -359,6 +366,9 @@ function InterestsSection({
 
       <h3>Role families</h3>
       <p className="note">
+        The words in the name are already searched for automatically — "aerospace &amp; defense
+        software" matches a posting mentioning any of those words, not only all three together.
+        Add keywords only for terms the name doesn't cover, like an abbreviation or a synonym.
         Weight is how much you want it. A lower weight ranks a family below others without
         excluding it; use the higher bar to say “only if it's a strong match”.
       </p>
@@ -370,15 +380,10 @@ function InterestsSection({
             value={family.name}
             onChange={(e) => setFamily(i, { name: e.target.value })}
           />
-          <input
-            type="text"
-            placeholder="keywords, comma separated"
-            value={(family.keywords ?? []).join(", ")}
-            onChange={(e) =>
-              setFamily(i, {
-                keywords: e.target.value.split(",").map((k) => k.trim()).filter(Boolean),
-              })
-            }
+          <CommaListInput
+            placeholder="extra keywords, comma separated (optional)"
+            value={family.keywords ?? []}
+            onChange={(keywords) => setFamily(i, { keywords })}
           />
           <label className="tight">
             weight
@@ -541,17 +546,11 @@ function InterestsSection({
         </label>
         <label>
           Seniority (comma separated)
-          <input
-            type="text"
+          <CommaListInput
             placeholder="intern, new-grad, junior"
-            value={(draft.hard_filters.seniority ?? []).join(", ")}
-            onChange={(e) =>
-              onPatch({
-                hard_filters: {
-                  ...draft.hard_filters,
-                  seniority: e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
-                },
-              })
+            value={draft.hard_filters.seniority ?? []}
+            onChange={(seniority) =>
+              onPatch({ hard_filters: { ...draft.hard_filters, seniority } })
             }
           />
         </label>
@@ -586,33 +585,21 @@ function InterestsSection({
       <div className="kv">
         <label>
           Companies
-          <input
-            type="text"
+          <CommaListInput
             placeholder="comma separated"
-            value={(draft.exclusions.companies ?? []).join(", ")}
-            onChange={(e) =>
-              onPatch({
-                exclusions: {
-                  ...draft.exclusions,
-                  companies: e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
-                },
-              })
+            value={draft.exclusions.companies ?? []}
+            onChange={(companies) =>
+              onPatch({ exclusions: { ...draft.exclusions, companies } })
             }
           />
         </label>
         <label>
           Title keywords
-          <input
-            type="text"
+          <CommaListInput
             placeholder="staffing, commission-only"
-            value={(draft.exclusions.title_keywords ?? []).join(", ")}
-            onChange={(e) =>
-              onPatch({
-                exclusions: {
-                  ...draft.exclusions,
-                  title_keywords: e.target.value.split(",").map((v) => v.trim()).filter(Boolean),
-                },
-              })
+            value={draft.exclusions.title_keywords ?? []}
+            onChange={(title_keywords) =>
+              onPatch({ exclusions: { ...draft.exclusions, title_keywords } })
             }
           />
         </label>

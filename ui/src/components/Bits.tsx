@@ -1,5 +1,5 @@
 /** Small shared pieces: confidence and completeness labels, badges, toasts, modals. */
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { QueueEntry } from "../api/client";
 
 /** A score is never shown bare — its confidence travels with it.
@@ -54,6 +54,49 @@ export function Modal({
         {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * A comma-separated list, edited as free text.
+ *
+ * A plain controlled `<input value={list.join(", ")}>` re-derives its own displayed value from
+ * the parsed array on every keystroke — so the instant you type a comma, the empty token it
+ * produces gets filtered out and the comma you just typed disappears from the box. This keeps
+ * the text you're typing as its own local state, only reconciling it against the canonical
+ * array (dropping blanks, trimming whitespace) once you leave the field.
+ */
+export function CommaListInput({
+  value, onChange, placeholder, className,
+}: {
+  value: string[];
+  onChange: (value: string[]) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [text, setText] = useState(value.join(", "));
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current) setText(value.join(", "));
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      className={className}
+      placeholder={placeholder}
+      value={text}
+      onFocus={() => { focused.current = true; }}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(e.target.value.split(",").map((s) => s.trim()).filter(Boolean));
+      }}
+      onBlur={() => {
+        focused.current = false;
+        setText(value.join(", "));
+      }}
+    />
   );
 }
 
