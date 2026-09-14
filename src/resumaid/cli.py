@@ -240,6 +240,26 @@ def interests_show() -> None:
         console.print(f"  {place.label} (weight {place.weight:g})")
 
 
+@interests_app.command("suggest")
+def interests_suggest() -> None:
+    """Candidate role families read from your resume's job titles. Nothing is written."""
+    from resumaid.ingest.resume import suggest_role_families
+
+    try:
+        profile = load_profile()
+    except FileNotFoundError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    suggestions = suggest_role_families(profile)
+    if not suggestions:
+        console.print("No titles to suggest from yet — add a resume with an Experience section.")
+        return
+    for fam in suggestions:
+        console.print(f"  {fam.name}")
+    console.print("\nAdd any of these with [bold]resumaid interests edit[/bold], "
+                  "or from the Setup tab.")
+
+
 @profile_app.command("edit")
 def profile_edit() -> None:
     """Open profile.yaml in your editor. It is yours to correct after the first parse."""

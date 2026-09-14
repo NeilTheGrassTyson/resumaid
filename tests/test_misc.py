@@ -18,8 +18,14 @@ from resumaid.applications.export import write_csv, write_xlsx
 from resumaid.applications.store import mark_ghosted, record_submission, update_application
 from resumaid.config import Settings, load_secrets, set_secrets, write_secrets_template
 from resumaid.db import connect, migrate
-from resumaid.ingest.resume import add_resume, detect_degree_level, extract_text, parse_profile
-from resumaid.models import Outcome, QueueState
+from resumaid.ingest.resume import (
+    add_resume,
+    detect_degree_level,
+    extract_text,
+    parse_profile,
+    suggest_role_families,
+)
+from resumaid.models import Employment, Outcome, Profile, QueueState
 from resumaid.queue import state as st
 from resumaid.queue.store import approve, upsert_posting
 from resumaid.util import iso, utcnow
@@ -275,6 +281,50 @@ def test_a_pdf_resume_parses_into_a_profile():
     assert profile.locations == ["Boston, MA"]
     assert profile.highest_degree_level == "bachelors"
     assert "Python" in profile.skills
+
+
+# --- role family suggestions ------------------------------------------------------------------
+
+
+def test_suggestions_strip_seniority_and_dedupe():
+    profile = Profile(
+        employment=[
+            Employment(title="Software Engineering Intern: Instrumentation & Test Automation"),
+            Employment(title="AI Development Intern"),
+            Employment(title="Senior Software Engineering Contractor"),
+            Employment(title="Instructional Assistant"),
+        ]
+    )
+    names = [f.name for f in suggest_role_families(profile)]
+    assert names == [
+        "Software Engineering", "AI Development", "Software Engineering Contractor",
+        "Instructional Assistant",
+    ]
+
+
+def test_suggestions_are_plain_role_families_with_no_keywords():
+    profile = Profile(employment=[Employment(title="Backend Engineer")])
+    [family] = suggest_role_families(profile)
+    assert family.keywords == []
+    assert family.weight == 1.0
+    assert family.min_fit is None
+
+
+def test_suggestions_respect_the_limit():
+    profile = Profile(employment=[Employment(title=f"Role {n}") for n in range(10)])
+    assert len(suggest_role_families(profile, limit=2)) == 2
+
+
+def test_suggestions_skip_titleless_entries():
+    profile = Profile(employment=[Employment(title=None), Employment(employer="Acme")])
+    assert suggest_role_families(profile) == []
+
+
+def test_suggestions_do_not_strip_an_unrelated_word_that_looks_like_seniority():
+    """'New Business Development' has 'New' in it for a reason that isn't seniority."""
+    profile = Profile(employment=[Employment(title="New Business Development Associate")])
+    [family] = suggest_role_families(profile)
+    assert family.name == "New Business Development"
 
 
 # --- degree detection -------------------------------------------------------------------------

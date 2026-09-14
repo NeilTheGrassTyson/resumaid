@@ -445,6 +445,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/interests/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interests Suggestions
+         * @description Candidate role families read from the parsed profile's job titles.
+         *
+         *     Read-only — nothing here writes to interests.yaml. The Setup tab offers these for the user
+         *     to add, edit, or ignore; the tool never declares targeting on its own (CLAUDE.md, Matching
+         *     and targeting).
+         */
+        get: operations["interests_suggestions_api_interests_suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/secrets": {
         parameters: {
             query?: never;
@@ -1795,6 +1819,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Profile"];
+                };
+            };
+        };
+    };
+    interests_suggestions_api_interests_suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleFamily"][];
                 };
             };
         };

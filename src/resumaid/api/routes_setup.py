@@ -20,15 +20,16 @@ from pydantic import ValidationError
 from resumaid.api.deps import get_db, get_settings
 from resumaid.api.schemas import ResumeOut, SecretsIn, SecretsStatus
 from resumaid.config import Settings, paths, set_secrets
-from resumaid.ingest.interests import save_interests, save_profile
+from resumaid.ingest.interests import load_profile, save_interests, save_profile
 from resumaid.ingest.resume import (
     SUPPORTED,
     add_resume,
     list_resumes,
     parse_profile,
     resume_texts,
+    suggest_role_families,
 )
-from resumaid.models import Interests, Profile, Source
+from resumaid.models import Interests, Profile, RoleFamily, Source
 from resumaid.sources.registry import board_from_url, disable, list_boards, register
 
 router = APIRouter(prefix="/api", tags=["setup"])
@@ -138,6 +139,21 @@ def reparse_profile(conn: sqlite3.Connection = Depends(get_db)) -> Profile:
     if not list_resumes(conn):
         raise HTTPException(400, "no resumes uploaded yet")
     return _reparse_profile(conn)
+
+
+@router.get("/interests/suggestions", response_model=list[RoleFamily])
+def interests_suggestions() -> list[RoleFamily]:
+    """Candidate role families read from the parsed profile's job titles.
+
+    Read-only — nothing here writes to interests.yaml. The Setup tab offers these for the user
+    to add, edit, or ignore; the tool never declares targeting on its own (CLAUDE.md, Matching
+    and targeting).
+    """
+    try:
+        profile = load_profile()
+    except FileNotFoundError:
+        return []
+    return suggest_role_families(profile)
 
 
 @router.put("/interests", response_model=Interests)

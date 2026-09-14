@@ -23,6 +23,7 @@ type Loaded = {
   boards: Board[];
   aggregatorConfigured: boolean;
   secretsStatus: SecretsStatus | null;
+  suggestions: RoleFamily[];
 };
 
 /**
@@ -87,7 +88,7 @@ const EMPTY_INTERESTS: Interests = {
 export default function SetupTab({ onChanged }: { onChanged: () => void }) {
   const [data, setData] = useState<Loaded>({
     resumes: [], profile: null, interests: null, boards: [], aggregatorConfigured: true,
-    secretsStatus: null,
+    secretsStatus: null, suggestions: [],
   });
   const [draft, setDraft] = useState<Draft>(normalize(null));
   const [dirty, setDirty] = useState(false);
@@ -103,15 +104,15 @@ export default function SetupTab({ onChanged }: { onChanged: () => void }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [resumes, boards, status, secretsStatus] = await Promise.all([
+    const [resumes, boards, status, secretsStatus, suggestions] = await Promise.all([
       api.resumes(), api.boards(), api.setupStatus().catch(() => null),
-      api.secretsStatus().catch(() => null),
+      api.secretsStatus().catch(() => null), api.suggestRoleFamilies().catch(() => []),
     ]);
     // Both 404 before first setup, which is a state to render rather than an error.
     const profile = await api.profile().catch(() => null);
     const interests = await api.interests().catch(() => null);
     setData({
-      resumes, profile, interests, boards, secretsStatus,
+      resumes, profile, interests, boards, secretsStatus, suggestions,
       aggregatorConfigured: status?.aggregator_configured ?? true,
     });
     if (interests && !dirty) setDraft(normalize(interests));
@@ -175,6 +176,7 @@ export default function SetupTab({ onChanged }: { onChanged: () => void }) {
         draft={draft}
         dirty={dirty}
         busy={busy}
+        suggestions={data.suggestions}
         onPatch={(patch) => { setDirty(true); setDraft((d) => ({ ...d, ...patch })); }}
         onPatchLocations={patchLocations}
         onSave={() =>
@@ -370,11 +372,12 @@ function ResumeSection({
 /* --- interests ----------------------------------------------------------------------- */
 
 function InterestsSection({
-  draft, dirty, busy, onPatch, onPatchLocations, onSave, onRevert,
+  draft, dirty, busy, suggestions, onPatch, onPatchLocations, onSave, onRevert,
 }: {
   draft: Draft;
   dirty: boolean;
   busy: boolean;
+  suggestions: RoleFamily[];
   onPatch: (patch: Partial<Draft>) => void;
   onPatchLocations: (patch: Partial<Draft["locations"]>) => void;
   onSave: () => void;
@@ -382,6 +385,15 @@ function InterestsSection({
 }) {
   const families = draft.role_families;
   const places = draft.locations.places;
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  // Once a name is on the list, or the user has said no thanks, it drops out of the strip —
+  // there's no point re-offering what's already there or already declined this session.
+  const declaredNames = new Set(families.map((f) => f.name.trim().toLowerCase()));
+  const pendingSuggestions = suggestions.filter((s) => {
+    const key = s.name.trim().toLowerCase();
+    return key && !declaredNames.has(key) && !dismissed.has(key);
+  });
 
   const setFamily = (index: number, patch: Partial<RoleFamily>) =>
     onPatch({
@@ -407,6 +419,34 @@ function InterestsSection({
         Weight is how much you want it. A lower weight ranks a family below others without
         excluding it; use the higher bar to say “only if it's a strong match”.
       </p>
+
+      {pendingSuggestions.length > 0 && (
+        <div className="chip-row" aria-label="Suggested from your resume">
+          <span className="note" style={{ alignSelf: "center", marginRight: 2 }}>
+            From your resume:
+          </span>
+          {pendingSuggestions.map((s) => (
+            <span className="chip" key={s.name}>
+              {s.name}
+              <button
+                className="add" title="Add this role family"
+                onClick={() => onPatch({ role_families: [...families, s] })}
+              >
+                + add
+              </button>
+              <button
+                title="Not this one"
+                onClick={() =>
+                  setDismissed((d) => new Set(d).add(s.name.trim().toLowerCase()))
+                }
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {families.map((family, i) => (
         <div className="family-row" key={i}>
           <input

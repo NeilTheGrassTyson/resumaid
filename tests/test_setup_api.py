@@ -308,6 +308,40 @@ def test_secrets_endpoint_refuses_unknown_fields(client):
     assert resp.status_code == 400
 
 
+# --- role family suggestions ----------------------------------------------------------------
+
+
+RESUME_WITH_EXPERIENCE = b"""Jane Q Public
+Boston, MA | jane@example.com
+
+Experience
+Software Engineering Intern | Acme Robotics   Jun 2025 - Aug 2025
+- Built a flight-control test harness in C++
+"""
+
+
+def test_suggestions_are_empty_with_no_employment_history(client):
+    """The `client` fixture seeds a profile with skills but no employment entries."""
+    assert client.get("/api/interests/suggestions").json() == []
+
+
+def test_suggestions_come_from_the_parsed_profile(client):
+    upload(client, content=RESUME_WITH_EXPERIENCE)
+    suggestions = client.get("/api/interests/suggestions").json()
+    assert suggestions == [
+        {"name": "Software Engineering", "weight": 1.0, "keywords": [], "min_fit": None}
+    ]
+
+
+def test_suggestions_never_write_to_interests(client):
+    """Read-only: fetching suggestions must not change what's already declared."""
+    upload(client, content=RESUME_WITH_EXPERIENCE)
+    before = client.get("/api/setup/status").json()["role_families"]
+    client.get("/api/interests/suggestions")
+    after = client.get("/api/setup/status").json()["role_families"]
+    assert after == before
+
+
 # --- setup status -------------------------------------------------------------------------
 
 

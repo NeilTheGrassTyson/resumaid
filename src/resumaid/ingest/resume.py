@@ -17,7 +17,7 @@ import re
 import sqlite3
 from pathlib import Path
 
-from resumaid.models import Education, Employment, Profile, ResumeDoc
+from resumaid.models import Education, Employment, Profile, ResumeDoc, RoleFamily
 from resumaid.util import iso, jdump, jload, utcnow
 
 SUPPORTED = {".pdf", ".docx", ".md", ".txt"}
@@ -78,6 +78,19 @@ _SENIORITY = [
     ("junior", r"\b(junior|jr\.?|associate|i{1,2}\b|\b1\b)\b"),
     ("senior", r"\b(senior|sr\.?|staff|principal|lead)\b"),
 ]
+
+#: Stripped from a job title before it becomes a suggested role family name, so "Software
+#: Engineering Intern" and "Senior Software Engineer" collapse to one family instead of two —
+#: level is what `hard_filters.seniority` is for, not what a family should be split on. Multi-
+#: word phrases are matched first so stripping them can't eat an unrelated single word (a title
+#: with "New" or "Entry" in it for some other reason).
+_SENIORITY_PHRASE = re.compile(
+    r"\b(new\s?grad(?:uate)?|entry[- ]level|co-?op|internship)\b", re.I
+)
+_SENIORITY_WORDS = {
+    "intern", "junior", "jr", "jr.", "senior", "sr", "sr.", "staff", "principal", "lead",
+    "associate", "i", "ii", "iii", "iv",
+}
 
 _SINGLE_DATE = re.compile(
     r"((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*\d{4}|\d{1,2}/\d{4}|\b(?:19|20)\d{2}\b)",
@@ -328,6 +341,39 @@ def parse_profile(texts: dict[str, str]) -> Profile:
             profile.locations = [home]
             break
     return profile
+
+
+def suggest_role_families(profile: Profile, *, limit: int = 4) -> list[RoleFamily]:
+    """Candidate role families read from the resume's own job titles.
+
+    Deterministic and profile-agnostic (CLAUDE.md): nothing here is a built-in idea of which
+    roles exist, only a reflection of titles already on the resume. These are suggestions, not
+    an assumption — the user adds, edits, or ignores each one on the Setup tab; nothing here
+    writes to interests.yaml on its own.
+
+    Keywords are left empty. `match_family` (scorer.py) already auto-derives keywords from a
+    family's own name, so a suggestion needs only a name to score well.
+    """
+    seen: dict[str, str] = {}  # lowercased -> display form, insertion order = resume order
+    for emp in profile.employment:
+        if not emp.title:
+            continue
+        head = emp.title.split(":", 1)[0]  # a colon usually introduces a sub-specialization
+        head = _SENIORITY_PHRASE.sub(" ", head)
+        words = [
+            w for w in re.split(r"\s+", head.strip())
+            if w.strip(",.") and w.strip(",.").lower() not in _SENIORITY_WORDS
+        ]
+        name = " ".join(words).strip(" ,-")
+        if len(name) < 3:
+            continue
+        key = name.lower()
+        if key not in seen:
+            seen[key] = name
+    return [
+        RoleFamily(name=name, weight=1.0, keywords=[], min_fit=None)
+        for name in list(seen.values())[:limit]
+    ]
 
 
 #: Words too common in any resume to say anything about a document's emphasis. Three groups:

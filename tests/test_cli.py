@@ -232,6 +232,12 @@ def test_secrets_set_refuses_an_unrecognized_key(tmp_path, monkeypatch):
     assert result.exit_code != 0
 
 
+def test_interests_suggest_reads_titles_off_the_resume(home):
+    result = invoke("interests", "suggest")
+    assert result.exit_code == 0
+    assert "Software Engineer" in result.stdout
+
+
 def test_init_writes_a_profile_agnostic_template(tmp_path, monkeypatch):
     """No role family, employer, or industry is a default — CLAUDE.md's core generality rule."""
     monkeypatch.setenv("RESUMAID_HOME", str(tmp_path))

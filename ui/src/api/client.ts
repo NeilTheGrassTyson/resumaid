@@ -127,6 +127,8 @@ export const api = {
 
   interests: () => request<Interests>("/api/interests"),
   saveInterests: (interests: Interests) => put<Interests>("/api/interests", interests),
+  /** Read-only — candidate role families read from the resume's job titles. */
+  suggestRoleFamilies: () => request<RoleFamily[]>("/api/interests/suggestions"),
 
   /** Write-only (ADR 0011): the response never carries a value back, only status. */
   secretsStatus: () => request<SecretsStatus>("/api/secrets"),
