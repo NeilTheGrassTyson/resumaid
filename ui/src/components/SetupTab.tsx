@@ -678,8 +678,9 @@ function BoardSection({
           ? "These also accumulate on their own — when an aggregator turns up a role hosted on " +
             "a known ATS, that board registers itself and its full descriptions become " +
             "available from then on."
-          : "Self-registration needs an aggregator key (Adzuna or USAJobs) in secrets.env — " +
-            "without one, add boards here by hand. See DATA_SOURCES.md."}
+          : "Self-registration needs an aggregator key — without one, add boards here by hand. " +
+            "Run `resumaid secrets edit` for a starter secrets.env with registration links " +
+            "for Adzuna and USAJobs (both free), or see DATA_SOURCES.md."}
       </p>
 
       <div className="place-row">

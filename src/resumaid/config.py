@@ -76,6 +76,49 @@ def paths() -> Paths:
     return Paths(app_dir())
 
 
+#: Written on `resumaid init` (or `resumaid secrets template`) if secrets.env doesn't exist yet.
+#: Every line is commented out — nothing here is a real credential, only where to get one.
+SECRETS_TEMPLATE = """\
+# API keys for the aggregator sources (DATA_SOURCES.md). Uncomment and fill in whichever you
+# register for; a source with no key configured is skipped silently, so this file can stay
+# mostly empty. Nothing here is required — Greenhouse, Lever, and Ashby need no key at all.
+#
+# Without at least one aggregator key, self-registering job boards has nothing to work from:
+# add boards yourself on the Setup tab, or via `resumaid board add <url>`.
+
+# Adzuna — broad multi-country listing search. Free tier, ~1,000 calls/month.
+# Register at https://developer.adzuna.com/ (a few minutes, no card required) to get an
+# app_id and app_key.
+# ADZUNA_APP_ID=
+# ADZUNA_APP_KEY=
+
+# USAJobs — federal roles. Free, and the one source whose permitted status is not in any doubt.
+# Request a key at https://developer.usajobs.gov/APIRequest/Index — it's emailed to the address
+# you register with, which USAJOBS_EMAIL below must match (the API requires it on every call).
+# USAJOBS_API_KEY=
+# USAJOBS_EMAIL=
+
+# Optional, not aggregators — see CLAUDE.md and DATA_SOURCES.md before setting either.
+# ANTHROPIC_API_KEY=       # near-the-bar adjudication (ADR 0006)
+# PERPLEXITY_API_KEY=      # company research, opt-in, never wired to ingestion
+"""
+
+
+def write_secrets_template(path: Path | None = None, *, overwrite: bool = False) -> Path:
+    """Scaffold secrets.env with registration links, never a credential value.
+
+    Mirrors ``write_interests_template`` — a file the user fills in by hand, never touched by
+    the app itself. Existing keys are left alone unless ``overwrite`` is set.
+    """
+    p = path or paths().ensure().secrets
+    if p.exists() and not overwrite:
+        return p
+    p.write_text(SECRETS_TEMPLATE, encoding="utf-8")
+    if not IS_WINDOWS:
+        os.chmod(p, 0o600)
+    return p
+
+
 def load_secrets(path: Path | None = None) -> dict[str, str]:
     """Read ``KEY=value`` lines from secrets.env, plus anything already in the environment.
 

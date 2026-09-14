@@ -188,8 +188,9 @@ def execute(
         if not boards_configured and not aggregator_configured:
             report.notes.append(
                 "no job boards added and no aggregator key configured, so there was nothing "
-                "to search — add a board on the Setup tab, or set an ADZUNA_ or USAJOBS_ key "
-                "(see DATA_SOURCES.md) so boards can register themselves"
+                "to search — add a board on the Setup tab, or run `resumaid secrets edit` for "
+                "a starter secrets.env with registration links, so boards can register "
+                "themselves"
             )
         elif not boards_configured and not interests.role_families:
             report.notes.append(

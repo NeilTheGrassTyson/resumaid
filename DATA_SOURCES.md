@@ -165,7 +165,10 @@ named by hand; `resumaid board list` shows what has accumulated and how each was
 ## Credentials
 
 Stored in `~/.resumaid/secrets.env`, mode 0600, outside the repository. Environment variables
-override the file.
+override the file. `resumaid secrets edit` scaffolds the file (registration links included as
+comments) and opens it in `$EDITOR`; `resumaid secrets path` just prints where it lives. Both
+only ever write placeholders — actual key values are always hand-typed by you, never entered
+through the app.
 
 ```
 ADZUNA_APP_ID=…
@@ -177,7 +180,18 @@ PERPLEXITY_API_KEY=…       # optional: company research
 ```
 
 A source with no credentials configured is skipped silently — the ATS sources need none, so the
-tool is useful before any key is set up.
+tool is useful before any key is set up. **No aggregator key means no self-registering job
+boards**: Greenhouse, Lever, and Ashby only ever poll companies you (or an aggregator) have
+added, so with neither key set, add boards yourself — `resumaid board add <url>` or the Setup
+tab — rather than waiting for a run to find them.
+
+**Getting a key** — both are free and take a few minutes:
+
+- **Adzuna**: register at <https://developer.adzuna.com/> for an `app_id` and `app_key`.
+  ~1,000 calls/month on the free tier, which is what caps search breadth (see above).
+- **USAJobs**: request a key at <https://developer.usajobs.gov/APIRequest/Index>. It's emailed
+  to the address you register with — that same address is `USAJOBS_EMAIL`, since the API
+  requires it on every call.
 
 ## Adding a source
 

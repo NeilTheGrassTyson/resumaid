@@ -23,7 +23,7 @@ from resumaid.applications.store import (
     stats,
     update_application,
 )
-from resumaid.config import Settings, paths
+from resumaid.config import Settings, paths, write_secrets_template
 from resumaid.db import connect
 from resumaid.ingest.interests import (
     load_interests,
@@ -45,12 +45,14 @@ board_app = typer.Typer(help="ATS boards to poll.", no_args_is_help=True)
 app_log = typer.Typer(help="Your application history.", no_args_is_help=True)
 interests_app = typer.Typer(help="What you're looking for.", no_args_is_help=True)
 profile_app = typer.Typer(help="Your parsed profile.", no_args_is_help=True)
+secrets_app = typer.Typer(help="API keys for the aggregator sources.", no_args_is_help=True)
 app.add_typer(resume_app, name="resume")
 app.add_typer(queue_app, name="queue")
 app.add_typer(board_app, name="board")
 app.add_typer(app_log, name="app")
 app.add_typer(interests_app, name="interests")
 app.add_typer(profile_app, name="profile")
+app.add_typer(secrets_app, name="secrets")
 
 console = Console()
 
@@ -92,10 +94,16 @@ def init() -> None:
     """Create ~/.resumaid and an interests.yaml to fill in."""
     p = paths().ensure()
     created = write_interests_template()
+    write_secrets_template()
     connect()
     console.print(f"[green]Ready.[/green] Data directory: {p.root}")
     console.print(f"Now edit [bold]{created}[/bold] — declare the role families, locations, and")
     console.print("filters you want. Nothing is assumed; targeting comes entirely from you.")
+    console.print(
+        "\n[bold]resumaid secrets edit[/bold] is optional — without an aggregator key "
+        "(Adzuna or USAJobs), job boards need to be added by hand; the key unlocks them "
+        "finding new companies on their own."
+    )
     console.print("\nThen: [bold]resumaid resume add <file>[/bold], "
                   "then [bold]resumaid run[/bold].")
 
@@ -260,6 +268,32 @@ def profile_reparse() -> None:
     save_profile(profile)
     console.print(f"[green]Re-parsed.[/green] {len(profile.skills)} skills, "
                   f"home: {profile.locations[0] if profile.locations else 'unknown'}")
+
+
+# --- secrets ---------------------------------------------------------------------------
+
+
+@secrets_app.command("edit")
+def secrets_edit() -> None:
+    """Open secrets.env in your editor. Scaffolds it with registration links first if missing.
+
+    A source with no key configured is skipped silently — Greenhouse, Lever, and Ashby need no
+    key at all, and self-registering job boards is the only thing an aggregator key unlocks.
+    """
+    path = write_secrets_template()
+    _open_in_editor(path)
+    from resumaid.config import load_secrets
+
+    configured = sorted(k for k, v in load_secrets(path).items() if v)
+    console.print(
+        f"[green]Saved.[/green] {len(configured)} key(s) set: {', '.join(configured) or 'none'}"
+    )
+
+
+@secrets_app.command("path")
+def secrets_path() -> None:
+    """Print where secrets.env lives, scaffolding it first if it doesn't exist yet."""
+    console.print(str(write_secrets_template()))
 
 
 # --- boards --------------------------------------------------------------------------

@@ -16,7 +16,7 @@ import pytest
 
 from resumaid.applications.export import write_csv, write_xlsx
 from resumaid.applications.store import mark_ghosted, record_submission, update_application
-from resumaid.config import Settings, load_secrets
+from resumaid.config import Settings, load_secrets, write_secrets_template
 from resumaid.db import connect, migrate
 from resumaid.ingest.resume import add_resume, detect_degree_level, extract_text, parse_profile
 from resumaid.models import Outcome, QueueState
@@ -188,6 +188,21 @@ def test_settings_reads_a_named_secret():
     settings = Settings(secrets={"ADZUNA_APP_ID": "abc"})
     assert settings.secret("ADZUNA_APP_ID") == "abc"
     assert settings.secret("NOT_SET") is None
+
+
+def test_secrets_template_has_no_live_credentials(tmp_path):
+    """Every key line is commented out — the scaffold must never *set* anything."""
+    path = write_secrets_template(tmp_path / "secrets.env")
+    assert load_secrets(path) == {}
+    assert "developer.adzuna.com" in path.read_text(encoding="utf-8")
+    assert "developer.usajobs.gov" in path.read_text(encoding="utf-8")
+
+
+def test_secrets_template_does_not_clobber_a_configured_file(tmp_path):
+    path = tmp_path / "secrets.env"
+    path.write_text("ADZUNA_APP_ID=already-set\n", encoding="utf-8")
+    write_secrets_template(path)
+    assert load_secrets(path)["ADZUNA_APP_ID"] == "already-set"
 
 
 # --- text extraction -----------------------------------------------------------------------

@@ -200,6 +200,18 @@ def test_init_creates_the_data_directory(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert (tmp_path / "interests.yaml").exists()
     assert (tmp_path / "resumaid.db").exists()
+    assert (tmp_path / "secrets.env").exists()
+
+
+def test_secrets_path_scaffolds_and_prints_the_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("RESUMAID_HOME", str(tmp_path))
+    result = invoke("secrets", "path")
+    assert result.exit_code == 0
+    assert "secrets.env" in result.stdout
+    assert (tmp_path / "secrets.env").exists()
+    from resumaid.config import load_secrets
+
+    assert load_secrets(tmp_path / "secrets.env") == {}
 
 
 def test_init_writes_a_profile_agnostic_template(tmp_path, monkeypatch):
