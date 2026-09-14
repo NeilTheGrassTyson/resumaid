@@ -201,6 +201,39 @@ assessment showed up. Edit any cell directly. Download it as a spreadsheet whene
 A quiet day is a real answer. If only three roles are good enough, you get three — the bar doesn't
 drop to fill a quota.
 
+## Getting a newer version
+
+When there's an update, downloading the new code is only two thirds of it. Two things do not
+update themselves, and skipping either gives you an error that looks worse than it is.
+
+**Windows**
+
+```powershell
+git pull                          # or download and unzip the new ZIP over your folder
+.venv\Scripts\Activate.ps1
+pip install -e ".[dev,xlsx]"      # picks up anything newly required
+cd ui ; npm install ; npm run build ; cd ..
+```
+
+**Mac**
+
+```bash
+git pull
+source .venv/bin/activate
+pip install -e ".[dev,xlsx]"
+cd ui && npm install && npm run build && cd ..
+```
+
+Why both matter:
+
+- **The install step** — a new version may need a package your setup doesn't have yet. Skip it
+  and starting resumaid fails with a long error ending in something like
+  `Form data requires "python-multipart" to be installed`. It reads like a bug in the app; it
+  just means the install step hasn't been re-run.
+- **The build step** — the browser page is built from source, and the built copy isn't part of
+  the download. Skip it and everything works, but you're looking at the *old* page, which is
+  confusing in a different way: the new feature is genuinely there and genuinely invisible.
+
 ---
 
 # Something went wrong

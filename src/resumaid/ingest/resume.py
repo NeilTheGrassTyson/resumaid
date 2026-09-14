@@ -33,16 +33,33 @@ _DEGREE_STRONG = [
 
 #: Bare two-letter abbreviations, which collide with state codes — "Boston, MA" is not a
 #: master's degree, and "Jackson, MS" is not one either. These only count with degree context
-#: around them, e.g. "BS in Computer Science" or "MS, Electrical Engineering".
+#: around them, e.g. "BS in Computer Science", "MS, Electrical Engineering", or the
+#: no-punctuation "BS Computer Science" a resume line often runs a major straight into.
 _DEGREE_WEAK = [
     ("masters", r"\bM\.?S\.?(?:c)?\b|\bM\.?A\.?\b"),
     ("bachelors", r"\bB\.?S\.?(?:c)?\b|\bB\.?A\.?\b"),
 ]
-_DEGREE_CONTEXT = r"(?:\s*(?:in|of)\b|\s*,\s*[A-Z]|\s+degree\b)"
+_DEGREE_CONTEXT = (
+    r"(?:\s*(?:in|of)\b|\s*,\s*[A-Z]|\s+degree\b|\s+[A-Z][a-z]+)"
+)
 DEGREE_ORDER = ["highschool", "associate", "bachelors", "masters", "doctorate"]
 
+#: Section headers, matched whole-line. Each covers the common phrasings a resume actually
+#: uses for that section, not just the canonical word — "Tools & Frameworks" and "Core
+#: Competencies" appear at least as often as "Skills" does.
 _SECTIONS = {
-    "skills": r"^\s*(technical\s+)?skills?(\s*&\s*\w+)?\s*:?\s*$",
+    "skills": (
+        r"^\s*(?:"
+        r"(?:technical|core|key|relevant|professional)\s+skills?"
+        r"|skills?"
+        r"|competenc(?:y|ies)"
+        r"|(?:technical|core)\s+proficienc(?:y|ies)"
+        r"|proficienc(?:y|ies)"
+        r"|technologies"
+        r"|programming\s+languages"
+        r"|tools?(?:\s*(?:&|and)\s*(?:technologies|frameworks))?"
+        r")(?:\s*(?:&|and)\s*\w+)?\s*:?\s*$"
+    ),
     "education": r"^\s*education\s*:?\s*$",
     "experience": r"^\s*(work\s+|professional\s+|relevant\s+)?experience\s*:?\s*$",
     "projects": r"^\s*(personal\s+|technical\s+)?projects?\s*:?\s*$",
@@ -150,11 +167,40 @@ def detect_degree_level(text: str) -> str | None:
     return max(found, key=lambda lvl: DEGREE_ORDER.index(lvl))
 
 
+def _merge_bullet_wraps(lines: list[str]) -> list[str]:
+    """Rejoin a bullet's wrapped continuation lines.
+
+    PDF extraction breaks a long bullet across physical lines without repeating its marker, so
+    a name that happens to fall on the wrap ("...students at National Yang Ming Chiao" /
+    "Tung University (Taiwan) on joint projects") reads as its own line. Anything that doesn't
+    open a new bullet, and follows one still open, is folded back into it instead.
+    """
+    merged: list[str] = []
+    open_bullet = False
+    for line in lines:
+        if _BULLET.match(line):
+            merged.append(line)
+            open_bullet = True
+        elif open_bullet and line.strip():
+            merged[-1] = merged[-1].rstrip() + " " + line.strip()
+        else:
+            merged.append(line)
+            open_bullet = False
+    return merged
+
+
 def parse_education(section: list[str], full_text: str) -> list[Education]:
+    """Degree/school lines, one entry per line.
+
+    A bullet is a detail about an entry above it (coursework, a study-abroad program, an
+    honor society), never a degree line on its own — without that check, a bullet that
+    happens to name a university in passing (a semester abroad, a collaboration) reads as a
+    second, spurious school.
+    """
     entries: list[Education] = []
-    for line in section:
+    for line in _merge_bullet_wraps(section):
         stripped = line.strip()
-        if not stripped or len(stripped) < 4:
+        if not stripped or len(stripped) < 4 or _BULLET.match(line):
             continue
         level = detect_degree_level(stripped)
         looks_like_school = re.search(

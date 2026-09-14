@@ -46,6 +46,10 @@ _SYNONYMS: dict[str, set[str]] = {
 
 _SENIORITY_DISTANCE = ["intern", "new-grad", "junior", "senior"]
 
+#: Filler words that carry no matching signal on their own, stripped when a role family or
+#: industry name is split into automatic keywords.
+_STOPWORDS = {"and", "the", "of", "for", "in", "a", "an", "or", "with"}
+
 
 def tokens(text: str) -> set[str]:
     # The trailing-dot strip matters: the character class keeps '.' so ".net" and "node.js"
@@ -63,6 +67,19 @@ def expand(toks: set[str]) -> set[str]:
 
 def _overlap(a: set[str], b: set[str]) -> set[str]:
     return expand(a) & expand(b)
+
+
+def _name_words(name: str) -> list[str]:
+    """The meaningful words already inside a role family or industry name.
+
+    "aerospace & defense software" implies "aerospace", "defense", and "software" as
+    independent signals, not only the three-word phrase together — a posting that says
+    "Aerospace Software Engineer" is a real hit even without the word "defense" anywhere in
+    it. This is mechanical tokenization of whatever the user typed, never a lookup of what a
+    particular industry or role means, so keywords stay automatic without the tool acquiring
+    a built-in idea of which roles or industries exist.
+    """
+    return [w for w in tokens(name) if len(w) > 2 and w not in _STOPWORDS]
 
 
 def score_skills(posting: RawPosting, profile: Profile) -> DimensionScore:
@@ -98,7 +115,10 @@ def match_family(posting: RawPosting, interests: Interests) -> tuple[RoleFamily 
     title_toks = tokens(posting.title)
     best: tuple[RoleFamily | None, float, str] = (None, 0.0, "no declared family matched")
     for fam in interests.role_families:
-        kws = [k for k in [*fam.keywords, fam.name] if k]
+        # Explicit keywords first, then the name itself as a whole phrase, then its individual
+        # words auto-derived — so a family declared with only a name still matches postings
+        # that use some but not all of its words.
+        kws = list(dict.fromkeys(k for k in [*fam.keywords, fam.name, *_name_words(fam.name)] if k))
         if not kws:
             continue
         hits, title_hits = [], []
@@ -282,13 +302,26 @@ def score_industry(posting: RawPosting, interests: Interests) -> DimensionScore:
     if not interests.industries:
         return DimensionScore(name="industry", score=50.0, weight=1.0,
                               evidence="no industries declared; scored neutral")
-    hay = tokens(
+    hay = expand(tokens(
         f"{posting.company} {posting.department or ''} {posting.description_text or ''}"
-    )
-    hits = [i for i in interests.industries if tokens(i) <= expand(hay)]
-    if hits:
+    ))
+    # Full phrase first; a partial word overlap still counts, scaled by how much of the
+    # declared industry's own words showed up — the words in "aerospace & defense" are
+    # automatic keywords, so a posting mentioning only one of them isn't a flat miss.
+    best_ratio, best_name = 0.0, None
+    for industry in interests.industries:
+        words = _name_words(industry)
+        if not words:
+            continue
+        ratio = len([w for w in words if w in hay]) / len(words)
+        if ratio > best_ratio:
+            best_ratio, best_name = ratio, industry
+    if best_ratio >= 1.0:
         return DimensionScore(name="industry", score=100.0, weight=1.0,
-                              evidence=f"matches {', '.join(hits)}")
+                              evidence=f"matches {best_name}")
+    if best_ratio > 0.0:
+        return DimensionScore(name="industry", score=35.0 + 65.0 * best_ratio, weight=1.0,
+                              evidence=f"partially matches {best_name}")
     return DimensionScore(name="industry", score=35.0, weight=1.0,
                           evidence="no declared industry mentioned")
 
