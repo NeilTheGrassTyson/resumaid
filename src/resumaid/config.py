@@ -119,6 +119,36 @@ def write_secrets_template(path: Path | None = None, *, overwrite: bool = False)
     return p
 
 
+def set_secrets(pairs: dict[str, str], path: Path | None = None) -> Path:
+    """Write specific key/value pairs into secrets.env, touching nothing else in the file.
+
+    A key already present — live or commented out, as the template ships it — is replaced in
+    place; a key with no line yet is appended. Every other line (comments, blanks, keys not in
+    ``pairs``) survives untouched, so the registration-link scaffolding stays intact across
+    repeated writes. This is the one function that writes an actual credential value to disk —
+    everything upstream of it (the API route, the CLI command) exists to reach this and nothing
+    more (ADR 0011).
+    """
+    p = path or paths().ensure().secrets
+    if not p.exists():
+        write_secrets_template(p)
+    remaining = dict(pairs)
+    out_lines: list[str] = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        candidate = stripped[1:].strip() if stripped.startswith("#") else stripped
+        key = candidate.split("=", 1)[0].strip() if "=" in candidate else None
+        if key in remaining:
+            out_lines.append(f"{key}={remaining.pop(key)}")
+        else:
+            out_lines.append(line)
+    out_lines.extend(f"{key}={value}" for key, value in remaining.items())
+    p.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+    if not IS_WINDOWS:
+        os.chmod(p, 0o600)
+    return p
+
+
 def load_secrets(path: Path | None = None) -> dict[str, str]:
     """Read ``KEY=value`` lines from secrets.env, plus anything already in the environment.
 

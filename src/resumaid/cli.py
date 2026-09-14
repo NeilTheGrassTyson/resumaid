@@ -23,7 +23,7 @@ from resumaid.applications.store import (
     stats,
     update_application,
 )
-from resumaid.config import Settings, paths, write_secrets_template
+from resumaid.config import Settings, paths, set_secrets, write_secrets_template
 from resumaid.db import connect
 from resumaid.ingest.interests import (
     load_interests,
@@ -288,6 +288,37 @@ def secrets_edit() -> None:
     console.print(
         f"[green]Saved.[/green] {len(configured)} key(s) set: {', '.join(configured) or 'none'}"
     )
+
+
+@secrets_app.command("set")
+def secrets_set(
+    pairs: list[str] = typer.Argument(
+        ..., help="KEY=VALUE, repeatable. e.g. ADZUNA_APP_ID=abc123 ADZUNA_APP_KEY=def456"
+    ),
+) -> None:
+    """Set one or more aggregator keys without opening an editor.
+
+    The CLI twin of `PUT /api/secrets` (ADR 0002) — same write-only shape, same four keys:
+    ADZUNA_APP_ID, ADZUNA_APP_KEY, USAJOBS_API_KEY, USAJOBS_EMAIL. Anything else is refused
+    rather than silently written, to keep the two surfaces doing exactly the same thing.
+    """
+    from resumaid.api.schemas import SecretsIn
+
+    allowed = set(SecretsIn.model_fields)
+    parsed: dict[str, str] = {}
+    for item in pairs:
+        key, sep, value = item.partition("=")
+        key = key.strip()
+        if not sep or key not in allowed:
+            console.print(f"[red]expected KEY=VALUE with KEY one of {sorted(allowed)}, "
+                          f"got {item!r}[/red]")
+            raise typer.Exit(1)
+        if not value:
+            console.print(f"[red]{key} needs a value[/red]")
+            raise typer.Exit(1)
+        parsed[key] = value
+    set_secrets(parsed)
+    console.print(f"[green]Saved.[/green] {len(parsed)} key(s): {', '.join(sorted(parsed))}")
 
 
 @secrets_app.command("path")

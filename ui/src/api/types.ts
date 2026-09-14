@@ -445,6 +445,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Secrets Status
+         * @description Which aggregator keys are configured. Never the values themselves (ADR 0011).
+         */
+        get: operations["secrets_status_api_secrets_get"];
+        /**
+         * Put Secrets
+         * @description Save one or more aggregator keys. A field left ``null`` leaves that key untouched.
+         *
+         *     Write-only: there is no route that returns a saved value, and this one never echoes the
+         *     body back. `secrets_status` above is how the frontend confirms a save landed.
+         */
+        put: operations["put_secrets_api_secrets_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/boards/{board_id}": {
         parameters: {
             query?: never;
@@ -907,6 +934,35 @@ export interface components {
             errors: string[];
             /** Summary */
             summary: string;
+        };
+        /**
+         * SecretsIn
+         * @description Write-only: a field left as ``None`` leaves that key untouched (ADR 0011) — this is
+         *     never populated from a stored value, so there is nothing to leave blank *to*.
+         */
+        SecretsIn: {
+            /** Adzuna App Id */
+            ADZUNA_APP_ID?: string | null;
+            /** Adzuna App Key */
+            ADZUNA_APP_KEY?: string | null;
+            /** Usajobs Api Key */
+            USAJOBS_API_KEY?: string | null;
+            /** Usajobs Email */
+            USAJOBS_EMAIL?: string | null;
+        };
+        /**
+         * SecretsStatus
+         * @description Whether each aggregator key is configured — never the value itself (ADR 0011).
+         */
+        SecretsStatus: {
+            /** Adzuna App Id */
+            ADZUNA_APP_ID: boolean;
+            /** Adzuna App Key */
+            ADZUNA_APP_KEY: boolean;
+            /** Usajobs Api Key */
+            USAJOBS_API_KEY: boolean;
+            /** Usajobs Email */
+            USAJOBS_EMAIL: boolean;
         };
         /** SlateOut */
         SlateOut: {
@@ -1739,6 +1795,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Profile"];
+                };
+            };
+        };
+    };
+    secrets_status_api_secrets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretsStatus"];
+                };
+            };
+        };
+    };
+    put_secrets_api_secrets_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecretsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

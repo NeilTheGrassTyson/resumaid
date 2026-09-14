@@ -16,7 +16,7 @@ import pytest
 
 from resumaid.applications.export import write_csv, write_xlsx
 from resumaid.applications.store import mark_ghosted, record_submission, update_application
-from resumaid.config import Settings, load_secrets, write_secrets_template
+from resumaid.config import Settings, load_secrets, set_secrets, write_secrets_template
 from resumaid.db import connect, migrate
 from resumaid.ingest.resume import add_resume, detect_degree_level, extract_text, parse_profile
 from resumaid.models import Outcome, QueueState
@@ -203,6 +203,38 @@ def test_secrets_template_does_not_clobber_a_configured_file(tmp_path):
     path.write_text("ADZUNA_APP_ID=already-set\n", encoding="utf-8")
     write_secrets_template(path)
     assert load_secrets(path)["ADZUNA_APP_ID"] == "already-set"
+
+
+def test_set_secrets_uncomments_the_scaffolded_line_in_place(tmp_path):
+    """The registration-link comments a line away from a key must survive a save."""
+    path = tmp_path / "secrets.env"
+    write_secrets_template(path)
+    before = path.read_text(encoding="utf-8")
+    set_secrets({"ADZUNA_APP_ID": "abc123"}, path)
+    after = path.read_text(encoding="utf-8")
+    assert load_secrets(path)["ADZUNA_APP_ID"] == "abc123"
+    assert "developer.adzuna.com" in after
+    # Every other line is untouched — only the one key's line changed.
+    before_lines = before.splitlines()
+    after_lines = after.splitlines()
+    changed = [i for i, (b, a) in enumerate(zip(before_lines, after_lines)) if b != a]
+    assert changed == [before_lines.index("# ADZUNA_APP_ID=")]
+
+
+def test_set_secrets_appends_a_key_with_no_existing_line(tmp_path):
+    path = tmp_path / "secrets.env"
+    path.write_text("# nothing here yet\n", encoding="utf-8")
+    set_secrets({"USAJOBS_EMAIL": "me@example.com"}, path)
+    assert load_secrets(path)["USAJOBS_EMAIL"] == "me@example.com"
+
+
+def test_set_secrets_leaves_other_keys_alone(tmp_path):
+    path = tmp_path / "secrets.env"
+    path.write_text("ADZUNA_APP_ID=keep-me\n", encoding="utf-8")
+    set_secrets({"ADZUNA_APP_KEY": "new-value"}, path)
+    secrets = load_secrets(path)
+    assert secrets["ADZUNA_APP_ID"] == "keep-me"
+    assert secrets["ADZUNA_APP_KEY"] == "new-value"
 
 
 # --- text extraction -----------------------------------------------------------------------

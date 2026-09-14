@@ -1,9 +1,10 @@
-"""Setup routes: resumes, the parsed profile, interests, and boards.
+"""Setup routes: resumes, the parsed profile, interests, boards, and aggregator credentials.
 
 These make the browser sufficient for everything except installing the tool. Each is the twin
 of a CLI command calling the same service function (ADR 0002) — the routes here own validation
 and file handling, never the parsing or persistence logic, which already lives in `ingest` and
-`sources.registry`.
+`sources.registry`. The credentials routes are write-only by design (ADR 0011): a value never
+travels back to the browser once saved, only whether a key is configured.
 """
 
 from __future__ import annotations
@@ -17,8 +18,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import ValidationError
 
 from resumaid.api.deps import get_db, get_settings
-from resumaid.api.schemas import ResumeOut
-from resumaid.config import Settings, paths
+from resumaid.api.schemas import ResumeOut, SecretsIn, SecretsStatus
+from resumaid.config import Settings, paths, set_secrets
 from resumaid.ingest.interests import save_interests, save_profile
 from resumaid.ingest.resume import (
     SUPPORTED,
@@ -151,6 +152,27 @@ def put_interests(interests: Interests) -> Interests:
     except (OSError, ValidationError) as exc:
         raise HTTPException(400, str(exc)) from exc
     return interests
+
+
+@router.get("/secrets", response_model=SecretsStatus)
+def secrets_status(settings: Settings = Depends(get_settings)) -> SecretsStatus:
+    """Which aggregator keys are configured. Never the values themselves (ADR 0011)."""
+    return SecretsStatus(**{
+        key: bool(settings.secret(key)) for key in SecretsStatus.model_fields
+    })
+
+
+@router.put("/secrets", status_code=204)
+def put_secrets(body: SecretsIn) -> None:
+    """Save one or more aggregator keys. A field left ``null`` leaves that key untouched.
+
+    Write-only: there is no route that returns a saved value, and this one never echoes the
+    body back. `secrets_status` above is how the frontend confirms a save landed.
+    """
+    pairs = {k: v for k, v in body.model_dump().items() if v}
+    if not pairs:
+        raise HTTPException(400, "no keys provided")
+    set_secrets(pairs)
 
 
 @router.post("/boards", status_code=201)

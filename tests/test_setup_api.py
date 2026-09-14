@@ -266,6 +266,48 @@ def test_removing_a_missing_board_is_404(client):
     assert client.delete("/api/boards/999").status_code == 404
 
 
+# --- secrets (ADR 0011: write-only) ---------------------------------------------------------
+
+
+def test_secrets_status_starts_unconfigured(client):
+    assert client.get("/api/secrets").json() == {
+        "ADZUNA_APP_ID": False, "ADZUNA_APP_KEY": False,
+        "USAJOBS_API_KEY": False, "USAJOBS_EMAIL": False,
+    }
+
+
+def test_saving_a_key_never_echoes_the_value_back(client):
+    resp = client.put("/api/secrets", json={"ADZUNA_APP_ID": "super-secret-value"})
+    assert resp.status_code == 204
+    assert "super-secret-value" not in resp.text
+    status = client.get("/api/secrets").json()
+    assert status["ADZUNA_APP_ID"] is True
+    assert "super-secret-value" not in client.get("/api/secrets").text
+
+
+def test_saving_one_key_does_not_touch_another(client, tmp_path):
+    client.put("/api/secrets", json={"ADZUNA_APP_ID": "id-value"})
+    client.put("/api/secrets", json={"ADZUNA_APP_KEY": "key-value"})
+    status = client.get("/api/secrets").json()
+    assert status["ADZUNA_APP_ID"] is True
+    assert status["ADZUNA_APP_KEY"] is True
+    from resumaid.config import load_secrets
+
+    secrets = load_secrets(tmp_path / "secrets.env")
+    assert secrets["ADZUNA_APP_ID"] == "id-value"
+    assert secrets["ADZUNA_APP_KEY"] == "key-value"
+
+
+def test_saving_no_keys_is_rejected(client):
+    assert client.put("/api/secrets", json={}).status_code == 400
+
+
+def test_secrets_endpoint_refuses_unknown_fields(client):
+    resp = client.put("/api/secrets", json={"ANTHROPIC_API_KEY": "nope"})
+    # Pydantic silently drops unrecognized fields by default; nothing gets written for one.
+    assert resp.status_code == 400
+
+
 # --- setup status -------------------------------------------------------------------------
 
 

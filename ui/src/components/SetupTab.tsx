@@ -12,8 +12,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api, ApiError,
   type Board, type Interests, type PlacePref, type Profile, type Resume, type RoleFamily,
+  type SecretsIn, type SecretsStatus,
 } from "../api/client";
-import { CommaListInput } from "./Bits";
+import { Badge, CommaListInput } from "./Bits";
 
 type Loaded = {
   resumes: Resume[];
@@ -21,6 +22,7 @@ type Loaded = {
   interests: Interests | null;
   boards: Board[];
   aggregatorConfigured: boolean;
+  secretsStatus: SecretsStatus | null;
 };
 
 /**
@@ -85,6 +87,7 @@ const EMPTY_INTERESTS: Interests = {
 export default function SetupTab({ onChanged }: { onChanged: () => void }) {
   const [data, setData] = useState<Loaded>({
     resumes: [], profile: null, interests: null, boards: [], aggregatorConfigured: true,
+    secretsStatus: null,
   });
   const [draft, setDraft] = useState<Draft>(normalize(null));
   const [dirty, setDirty] = useState(false);
@@ -100,14 +103,15 @@ export default function SetupTab({ onChanged }: { onChanged: () => void }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [resumes, boards, status] = await Promise.all([
+    const [resumes, boards, status, secretsStatus] = await Promise.all([
       api.resumes(), api.boards(), api.setupStatus().catch(() => null),
+      api.secretsStatus().catch(() => null),
     ]);
     // Both 404 before first setup, which is a state to render rather than an error.
     const profile = await api.profile().catch(() => null);
     const interests = await api.interests().catch(() => null);
     setData({
-      resumes, profile, interests, boards,
+      resumes, profile, interests, boards, secretsStatus,
       aggregatorConfigured: status?.aggregator_configured ?? true,
     });
     if (interests && !dirty) setDraft(normalize(interests));
@@ -181,6 +185,8 @@ export default function SetupTab({ onChanged }: { onChanged: () => void }) {
         }
         onRevert={() => { setDraft(normalize(data.interests)); setDirty(false); }}
       />
+
+      <SecretsSection status={data.secretsStatus} busy={busy} act={act} />
 
       <BoardSection
         boards={data.boards}
@@ -647,6 +653,125 @@ function InterestsSection({
   );
 }
 
+/* --- secrets --------------------------------------------------------------------------
+ *
+ * Write-only (ADR 0011): fields always load blank, a badge says whether a key is already
+ * set, and saving clears the field back to blank rather than leaving the typed value sitting
+ * around. Scoped to the two aggregator keys only — ANTHROPIC_API_KEY and PERPLEXITY_API_KEY
+ * stay CLI/file-only (`resumaid secrets edit`) until they're actually load-bearing.
+ */
+
+function SecretsSection({
+  status, busy, act,
+}: {
+  status: SecretsStatus | null;
+  busy: boolean;
+  act: (label: string, fn: () => Promise<unknown>) => Promise<void>;
+}) {
+  const [adzunaId, setAdzunaId] = useState("");
+  const [adzunaKey, setAdzunaKey] = useState("");
+  const [usaKey, setUsaKey] = useState("");
+  const [usaEmail, setUsaEmail] = useState("");
+
+  const save = (patch: SecretsIn, clear: () => void) => {
+    if (!Object.values(patch).some((v) => v)) return;
+    void act("Key saved", async () => {
+      await api.saveSecrets(patch);
+      clear();
+    });
+  };
+
+  return (
+    <section className="setup-block">
+      <h2>Aggregator credentials</h2>
+      <p className="note">
+        Write-only — once saved, a key is never shown here again, only whether it's set. Either
+        one below unlocks self-registering job boards; you don't need both, and neither is
+        required — Greenhouse, Lever, and Ashby need no key at all.{" "}
+        <code>resumaid secrets edit</code> reaches the same file by hand, if you'd rather.
+      </p>
+
+      <h3>Adzuna</h3>
+      <p className="note">
+        Free at{" "}
+        <a href="https://developer.adzuna.com/" target="_blank" rel="noreferrer">
+          developer.adzuna.com
+        </a>{" "}
+        — registration gets you an app ID and app key.
+      </p>
+      <div className="kv">
+        <label>
+          App ID {status?.ADZUNA_APP_ID && <Badge kind="confirm">set</Badge>}
+          <input
+            type="password" autoComplete="off"
+            placeholder={status?.ADZUNA_APP_ID ? "leave blank to keep" : "not set"}
+            value={adzunaId} onChange={(e) => setAdzunaId(e.target.value)}
+          />
+        </label>
+        <label>
+          App key {status?.ADZUNA_APP_KEY && <Badge kind="confirm">set</Badge>}
+          <input
+            type="password" autoComplete="off"
+            placeholder={status?.ADZUNA_APP_KEY ? "leave blank to keep" : "not set"}
+            value={adzunaKey} onChange={(e) => setAdzunaKey(e.target.value)}
+          />
+        </label>
+      </div>
+      <button
+        className="ghost-btn" disabled={busy || (!adzunaId.trim() && !adzunaKey.trim())}
+        onClick={() =>
+          save(
+            { ADZUNA_APP_ID: adzunaId.trim() || undefined,
+              ADZUNA_APP_KEY: adzunaKey.trim() || undefined },
+            () => { setAdzunaId(""); setAdzunaKey(""); },
+          )
+        }
+      >
+        Save Adzuna key
+      </button>
+
+      <h3>USAJobs</h3>
+      <p className="note">
+        Request a key at{" "}
+        <a href="https://developer.usajobs.gov/APIRequest/Index" target="_blank" rel="noreferrer">
+          developer.usajobs.gov
+        </a>{" "}
+        — it's emailed to the address you register with, which has to match the email below.
+      </p>
+      <div className="kv">
+        <label>
+          API key {status?.USAJOBS_API_KEY && <Badge kind="confirm">set</Badge>}
+          <input
+            type="password" autoComplete="off"
+            placeholder={status?.USAJOBS_API_KEY ? "leave blank to keep" : "not set"}
+            value={usaKey} onChange={(e) => setUsaKey(e.target.value)}
+          />
+        </label>
+        <label>
+          Registered email {status?.USAJOBS_EMAIL && <Badge kind="confirm">set</Badge>}
+          <input
+            type="email" autoComplete="off"
+            placeholder={status?.USAJOBS_EMAIL ? "leave blank to keep" : "you@example.com"}
+            value={usaEmail} onChange={(e) => setUsaEmail(e.target.value)}
+          />
+        </label>
+      </div>
+      <button
+        className="ghost-btn" disabled={busy || (!usaKey.trim() && !usaEmail.trim())}
+        onClick={() =>
+          save(
+            { USAJOBS_API_KEY: usaKey.trim() || undefined,
+              USAJOBS_EMAIL: usaEmail.trim() || undefined },
+            () => { setUsaKey(""); setUsaEmail(""); },
+          )
+        }
+      >
+        Save USAJobs key
+      </button>
+    </section>
+  );
+}
+
 /* --- boards -------------------------------------------------------------------------- */
 
 function BoardSection({
@@ -679,8 +804,7 @@ function BoardSection({
             "a known ATS, that board registers itself and its full descriptions become " +
             "available from then on."
           : "Self-registration needs an aggregator key — without one, add boards here by hand. " +
-            "Run `resumaid secrets edit` for a starter secrets.env with registration links " +
-            "for Adzuna and USAJobs (both free), or see DATA_SOURCES.md."}
+            "Save an Adzuna or USAJobs key above to unlock it."}
       </p>
 
       <div className="place-row">

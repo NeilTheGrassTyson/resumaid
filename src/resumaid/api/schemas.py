@@ -152,3 +152,22 @@ class StatsOut(BaseModel):
     by_outcome: dict[str, int]
     oa_received: int
     oa_known: int
+
+
+class SecretsStatus(BaseModel):
+    """Whether each aggregator key is configured — never the value itself (ADR 0011)."""
+
+    ADZUNA_APP_ID: bool
+    ADZUNA_APP_KEY: bool
+    USAJOBS_API_KEY: bool
+    USAJOBS_EMAIL: bool
+
+
+class SecretsIn(BaseModel):
+    """Write-only: a field left as ``None`` leaves that key untouched (ADR 0011) — this is
+    never populated from a stored value, so there is nothing to leave blank *to*."""
+
+    ADZUNA_APP_ID: str | None = None
+    ADZUNA_APP_KEY: str | None = None
+    USAJOBS_API_KEY: str | None = None
+    USAJOBS_EMAIL: str | None = None

@@ -139,6 +139,7 @@ API_TO_CLI = {
     "/api/profile": "profile edit",
     "/api/profile/reparse": "profile reparse",
     "/api/interests": "interests edit",
+    "/api/secrets": "secrets set",
     "/api/boards": "board add",
     "/api/boards/{board_id}": "board remove",
     "/api/boards/{board_id}/enable": "board enable",
@@ -212,6 +213,23 @@ def test_secrets_path_scaffolds_and_prints_the_file(tmp_path, monkeypatch):
     from resumaid.config import load_secrets
 
     assert load_secrets(tmp_path / "secrets.env") == {}
+
+
+def test_secrets_set_writes_the_given_keys(tmp_path, monkeypatch):
+    monkeypatch.setenv("RESUMAID_HOME", str(tmp_path))
+    result = invoke("secrets", "set", "ADZUNA_APP_ID=abc", "ADZUNA_APP_KEY=def")
+    assert result.exit_code == 0
+    from resumaid.config import load_secrets
+
+    secrets = load_secrets(tmp_path / "secrets.env")
+    assert secrets["ADZUNA_APP_ID"] == "abc"
+    assert secrets["ADZUNA_APP_KEY"] == "def"
+
+
+def test_secrets_set_refuses_an_unrecognized_key(tmp_path, monkeypatch):
+    monkeypatch.setenv("RESUMAID_HOME", str(tmp_path))
+    result = invoke("secrets", "set", "SOME_OTHER_KEY=x")
+    assert result.exit_code != 0
 
 
 def test_init_writes_a_profile_agnostic_template(tmp_path, monkeypatch):

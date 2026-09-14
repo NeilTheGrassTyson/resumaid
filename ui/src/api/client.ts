@@ -14,6 +14,8 @@ export type Profile = components["schemas"]["Profile"];
 export type Interests = components["schemas"]["Interests"];
 export type PlacePref = components["schemas"]["PlacePref"];
 export type RoleFamily = components["schemas"]["RoleFamily"];
+export type SecretsStatus = components["schemas"]["SecretsStatus"];
+export type SecretsIn = components["schemas"]["SecretsIn"];
 
 export type SetupStatus = {
   resumes: number;
@@ -125,6 +127,10 @@ export const api = {
 
   interests: () => request<Interests>("/api/interests"),
   saveInterests: (interests: Interests) => put<Interests>("/api/interests", interests),
+
+  /** Write-only (ADR 0011): the response never carries a value back, only status. */
+  secretsStatus: () => request<SecretsStatus>("/api/secrets"),
+  saveSecrets: (secrets: SecretsIn) => put<void>("/api/secrets", secrets),
 
   boards: () => request<Board[]>("/api/boards"),
   addBoard: (url: string) =>

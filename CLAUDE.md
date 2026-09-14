@@ -260,6 +260,14 @@ them out now.
   the permitted status is not in any doubt. Neither closes the Workday gap. See
   `DATA_SOURCES.md`.
 - **Stack** — see Stack above.
+- **Frontend-complete configuration.** Every setting the user can change lives in the Setup
+  tab; the CLI is the twin (Stack above), not the primary surface — nothing should require
+  a text editor to configure day to day. This includes credentials: the Tier list still
+  means a new credential-handling surface gets a conversation first (that conversation
+  happened for the aggregator keys — see `docs/adr/0011-frontend-writable-secrets-write-only.md`
+  for the pattern: write-only, scoped to the specific keys in question, never a value round
+  trip back to the browser). Apply that pattern rather than re-deriving it each time a new
+  credential needs a frontend path.
 
 ---
 
