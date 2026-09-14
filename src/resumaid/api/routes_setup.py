@@ -16,9 +16,9 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import ValidationError
 
-from resumaid.api.deps import get_db
+from resumaid.api.deps import get_db, get_settings
 from resumaid.api.schemas import ResumeOut
-from resumaid.config import paths
+from resumaid.config import Settings, paths
 from resumaid.ingest.interests import save_interests, save_profile
 from resumaid.ingest.resume import (
     SUPPORTED,
@@ -206,7 +206,10 @@ def enable_board(board_id: int, conn: sqlite3.Connection = Depends(get_db)) -> N
 
 
 @router.get("/setup/status")
-def setup_status(conn: sqlite3.Connection = Depends(get_db)) -> dict[str, object]:
+def setup_status(
+    conn: sqlite3.Connection = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> dict[str, object]:
     """What still needs doing before a run will find anything useful."""
     resumes = list_resumes(conn)
     boards = list_boards(conn, enabled_only=False)
@@ -217,9 +220,16 @@ def setup_status(conn: sqlite3.Connection = Depends(get_db)) -> dict[str, object
         families = len(interests.role_families)
     except (FileNotFoundError, ValidationError):
         families = 0
+    # Self-registering boards (CLAUDE.md, Decided) depend on an aggregator surfacing one — with
+    # neither key configured, a run can never grow the board list on its own.
+    aggregator_configured = bool(
+        (settings.secret("ADZUNA_APP_ID") and settings.secret("ADZUNA_APP_KEY"))
+        or (settings.secret("USAJOBS_API_KEY") and settings.secret("USAJOBS_EMAIL"))
+    )
     return {
         "resumes": len(resumes),
         "role_families": families,
         "boards": len([b for b in boards if b["enabled"]]),
         "ready": bool(resumes) and families > 0,
+        "aggregator_configured": aggregator_configured,
     }

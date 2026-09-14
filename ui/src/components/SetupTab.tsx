@@ -20,6 +20,7 @@ type Loaded = {
   profile: Profile | null;
   interests: Interests | null;
   boards: Board[];
+  aggregatorConfigured: boolean;
 };
 
 /**
@@ -83,13 +84,14 @@ const EMPTY_INTERESTS: Interests = {
 
 export default function SetupTab({ onChanged }: { onChanged: () => void }) {
   const [data, setData] = useState<Loaded>({
-    resumes: [], profile: null, interests: null, boards: [],
+    resumes: [], profile: null, interests: null, boards: [], aggregatorConfigured: true,
   });
   const [draft, setDraft] = useState<Draft>(normalize(null));
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
 
   const say = useCallback((text: string) => {
     setError(null);
@@ -98,11 +100,16 @@ export default function SetupTab({ onChanged }: { onChanged: () => void }) {
   }, []);
 
   const load = useCallback(async () => {
-    const [resumes, boards] = await Promise.all([api.resumes(), api.boards()]);
+    const [resumes, boards, status] = await Promise.all([
+      api.resumes(), api.boards(), api.setupStatus().catch(() => null),
+    ]);
     // Both 404 before first setup, which is a state to render rather than an error.
     const profile = await api.profile().catch(() => null);
     const interests = await api.interests().catch(() => null);
-    setData({ resumes, profile, interests, boards });
+    setData({
+      resumes, profile, interests, boards,
+      aggregatorConfigured: status?.aggregator_configured ?? true,
+    });
     if (interests && !dirty) setDraft(normalize(interests));
   }, [dirty]);
 
@@ -125,6 +132,21 @@ export default function SetupTab({ onChanged }: { onChanged: () => void }) {
     },
     [load, onChanged, say],
   );
+
+  const runDiscovery = useCallback(async () => {
+    setRunning(true);
+    setError(null);
+    try {
+      const report = await api.run();
+      await load();
+      onChanged();
+      say(report.summary);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setRunning(false);
+    }
+  }, [load, onChanged, say]);
 
   const patchLocations = (patch: Partial<Draft["locations"]>) => {
     setDirty(true);
@@ -160,7 +182,14 @@ export default function SetupTab({ onChanged }: { onChanged: () => void }) {
         onRevert={() => { setDraft(normalize(data.interests)); setDirty(false); }}
       />
 
-      <BoardSection boards={data.boards} busy={busy} act={act} />
+      <BoardSection
+        boards={data.boards}
+        busy={busy}
+        act={act}
+        aggregatorConfigured={data.aggregatorConfigured}
+        onRun={() => void runDiscovery()}
+        running={running}
+      />
     </div>
   );
 }
@@ -621,11 +650,14 @@ function InterestsSection({
 /* --- boards -------------------------------------------------------------------------- */
 
 function BoardSection({
-  boards, busy, act,
+  boards, busy, act, aggregatorConfigured, onRun, running,
 }: {
   boards: Board[];
   busy: boolean;
   act: (label: string, fn: () => Promise<unknown>) => Promise<void>;
+  aggregatorConfigured: boolean;
+  onRun: () => void;
+  running: boolean;
 }) {
   const [url, setUrl] = useState("");
 
@@ -642,9 +674,12 @@ function BoardSection({
     <section className="setup-block">
       <h2>Job boards</h2>
       <p className="note">
-        Companies polled directly. These accumulate on their own — when an aggregator turns up a
-        role hosted on a known ATS, that board registers itself and its full descriptions become
-        available from then on.
+        Companies polled directly. {aggregatorConfigured
+          ? "These also accumulate on their own — when an aggregator turns up a role hosted on " +
+            "a known ATS, that board registers itself and its full descriptions become " +
+            "available from then on."
+          : "Self-registration needs an aggregator key (Adzuna or USAJobs) in secrets.env — " +
+            "without one, add boards here by hand. See DATA_SOURCES.md."}
       </p>
 
       <div className="place-row">
@@ -659,10 +694,19 @@ function BoardSection({
         <button className="ghost-btn" disabled={busy || !url.trim()} onClick={add}>
           Add board
         </button>
+        <button className="ghost-btn" disabled={running} onClick={onRun}
+                title="Poll every configured board and aggregator now">
+          {running ? "Running…" : "Run discovery"}
+        </button>
       </div>
 
       {boards.length === 0 ? (
-        <p className="note">None yet. Add one above, or let a run discover them.</p>
+        <p className="note">
+          {aggregatorConfigured
+            ? "None yet. Add one above, or run discovery and let one turn up."
+            : "None yet. Add one above — with no aggregator key set, discovery can only poll " +
+              "boards you've added; it has no way to find new ones on its own."}
+        </p>
       ) : (
         <table className="data compact">
           <thead>

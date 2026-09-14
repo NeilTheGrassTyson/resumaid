@@ -20,6 +20,7 @@ export type SetupStatus = {
   role_families: number;
   boards: number;
   ready: boolean;
+  aggregator_configured: boolean;
 };
 
 export type Board = {

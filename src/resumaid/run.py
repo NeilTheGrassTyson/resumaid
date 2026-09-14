@@ -42,6 +42,11 @@ class RunReport:
     expired: int = 0
     sources_polled: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    #: Why a run came back empty, so "0 postings seen" isn't a dead end. Self-registering
+    #: boards (CLAUDE.md, Decided) only happens when an aggregator surfaces one — a run with
+    #: no manually-added boards and no aggregator key configured cannot find anything, and
+    #: silently saying so nothing beats a blank queue with no explanation.
+    notes: list[str] = field(default_factory=list)
 
     def summary(self) -> str:
         parts = [
@@ -56,7 +61,10 @@ class RunReport:
             parts.append(f"{self.expired} expired")
         if self.errors:
             parts.append(f"{len(self.errors)} source errors")
-        return ", ".join(parts)
+        text = ", ".join(parts)
+        if self.notes:
+            text += " — " + "; ".join(self.notes)
+        return text
 
 
 def _search_terms(interests: Interests) -> list[str]:
@@ -165,8 +173,29 @@ def execute(
     cursor = conn.execute("INSERT INTO runs (started_at) VALUES (?)", (started,))
     run_id = int(cursor.lastrowid or 0)
 
+    # Captured before ingest() can grow the registry, so this reflects what the run actually
+    # started with rather than what it just added.
+    boards_configured = bool(list_boards(conn))
+
     found = postings if postings is not None else fetch_all(conn, interests, settings, report)
     seen = ingest(conn, found, report)
+
+    if postings is None and report.postings_seen == 0 and not report.errors:
+        aggregator_configured = bool(
+            (settings.secret("ADZUNA_APP_ID") and settings.secret("ADZUNA_APP_KEY"))
+            or (settings.secret("USAJOBS_API_KEY") and settings.secret("USAJOBS_EMAIL"))
+        )
+        if not boards_configured and not aggregator_configured:
+            report.notes.append(
+                "no job boards added and no aggregator key configured, so there was nothing "
+                "to search — add a board on the Setup tab, or set an ADZUNA_ or USAJOBS_ key "
+                "(see DATA_SOURCES.md) so boards can register themselves"
+            )
+        elif not boards_configured and not interests.role_families:
+            report.notes.append(
+                "no job boards added and no role family declared, so the aggregator had "
+                "nothing to search for — add a board, or declare a role family on the Setup tab"
+            )
 
     summary = score_and_gate(
         conn, profile, interests, settings, list_resumes(conn),

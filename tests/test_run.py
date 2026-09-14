@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import httpx
 import pytest
+import respx
 
 from resumaid import run as run_mod
 from resumaid.applications.store import record_submission
+from resumaid.config import Settings
 from resumaid.ingest.resume import add_resume
 from resumaid.models import (
     Completeness,
@@ -197,3 +200,38 @@ def test_resume_selection_is_recorded_on_queued_entries(
     ).fetchone()
     assert row["recommended_resume_id"]
     assert row["selection_rationale"]
+
+
+# --- explaining an empty run --------------------------------------------------------------
+
+
+def test_empty_run_explains_no_boards_and_no_aggregator(db, profile, interests, settings):
+    """"0 postings seen" on its own looks like a bug, not an unmet precondition."""
+    report = run_mod.execute(db, profile, interests, settings)
+    assert report.postings_seen == 0
+    assert report.notes
+    assert "aggregator" in report.notes[0]
+    assert report.notes[0] in report.summary()
+
+
+def test_empty_run_explains_no_role_family_when_aggregator_is_configured(db, profile):
+    no_families = Interests(locations=LocationPrefs(remote=True))
+    configured = Settings(secrets={"ADZUNA_APP_ID": "id", "ADZUNA_APP_KEY": "key"})
+    report = run_mod.execute(db, profile, no_families, configured)
+    assert report.postings_seen == 0
+    assert report.notes
+    assert "role family" in report.notes[0]
+
+
+@respx.mock
+def test_a_run_with_boards_configured_gets_no_note(db, profile, interests, settings):
+    """The note is for an unmet precondition, not for a board that just had nothing today."""
+    from resumaid.sources.registry import register
+
+    register(db, Source.GREENHOUSE, "acme")
+    respx.get("https://boards-api.greenhouse.io/v1/boards/acme/jobs").mock(
+        return_value=httpx.Response(200, json={"jobs": []})
+    )
+    report = run_mod.execute(db, profile, interests, settings)
+    assert report.postings_seen == 0
+    assert report.notes == []

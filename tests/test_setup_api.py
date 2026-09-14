@@ -278,7 +278,10 @@ def test_setup_status_is_ready_once_configured(client):
     client.put("/api/interests", json=VALID_INTERESTS)
     client.post("/api/boards", json={"url": "https://boards.greenhouse.io/anduril"})
     status = client.get("/api/setup/status").json()
-    assert status == {"resumes": 1, "role_families": 1, "boards": 1, "ready": True}
+    assert status == {
+        "resumes": 1, "role_families": 1, "boards": 1, "ready": True,
+        "aggregator_configured": False,
+    }
 
 
 # --- the constraint that governs all of this ------------------------------------------------
